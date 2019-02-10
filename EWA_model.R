@@ -150,44 +150,49 @@ model_data=model_data_full[,1:4]
 # lets check correlation & rmse between corresponding average choice in rounds
 # for human and model
 
+# ideally:
+# agent_type, round, mean, se
 
 # average across groups and players
 # to get average choice made for each round for humans and models
-compare_dat=data.frame(unique(select(mutate(group_by(model_data, round),
-                                            model_average=mean(own_choice),
-                                            model_se=sd(own_choice)/sqrt(length(own_choice))
-                                            ),
-                                     round,model_average,model_se)),
-                       unique(select(mutate(group_by(human_data, round),
-                                            human_average=mean(choice),
-                                            human_se=sd(choice)/sqrt(length(choice))
-                                            ),
-                                     round, human_average, human_se))
-)[,c("round", "model_average", "model_se", "human_average", "human_se")]
-# there might be a better way to do the above so that ggplot lets me 
-# treat a human_or_model variable as a grouping variable and gives me a legend
+compare_dat=rbind(
+  data.frame(unique(select(mutate(group_by(model_data, round),
+                                  mean=mean(own_choice),
+                                  se=sd(own_choice)/sqrt(length(own_choice)),
+                                  agent_type="model"
+                                  ),
+                           agent_type,round,mean,se))
+             ),
+  data.frame(unique(select(mutate(group_by(human_data, round),
+                                  mean=mean(choice),
+                                  se=sd(choice)/sqrt(length(choice)),
+                                  agent_type="human"
+                                  ),
+                           agent_type,round,mean,se))
+             )
+)
+
 
 
 
 # look at it visually
 ggplot(compare_dat)+
-  geom_line(aes(x=round, y=human_average), color="red")+
-  geom_line(aes(x=round, y=model_average))+
-  geom_errorbar(mapping=aes(x=round, ymin=human_average-human_se, ymax=human_average+human_se), 
-                color="red", width=.2)+
-  geom_errorbar(mapping=aes(x=round, ymin=model_average-model_se, ymax=model_average+model_se),
+  geom_line(aes(x=round, y=mean, color=agent_type))+
+  geom_errorbar(mapping=aes(x=round, ymin=mean-se, ymax=mean+se, color=agent_type), 
                 width=.2)+
   labs("average choice")+
   labs(title="average choice by round for human and model agents",
-       subtitle="error bars represent standard error",
-       caption="human data is in red, model data is in black")
+       caption="error bars represent standard error")
+
+
 
 # correlation
-cor(compare_dat$model_average, compare_dat$human_average)
+cor(compare_dat[compare_dat$agent_type=="human",]$mean, compare_dat[compare_dat$agent_type=="model",]$mean)
 
 # rmse
 # sqrt(mean((m - o)^2))
-sqrt(mean((compare_dat$model_average-compare_dat$human_average)^2))
+sqrt(mean((compare_dat[compare_dat$agent_type=="human",]$mean-
+             compare_dat[compare_dat$agent_type=="model",]$mean)^2))
 
 
 
