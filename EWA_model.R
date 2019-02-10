@@ -2,6 +2,7 @@
 
 library(dplyr)
 library(truncnorm)
+library(ggplot2)
 
 Make_EWA_model <- setRefClass(
   "EWA_Model",
@@ -83,36 +84,27 @@ Make_EWA_model <- setRefClass(
                     phi=phi
                     )
       )
-      
     }
-    
   )
 )
 
 
-
-# p_m, psd : parameter means, parameter sd's
-# [delta, rho, lambda, phi]
-p_m=c(1,1,1,1)
-psd=c(.01,.01,.01,.01)
-
-# initial choice probabilities based on human data
-choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
-
-# number of simulations to run
-n_sims=100
-
-model_data_full=data.frame()
-
-if(TRUE){
-  # gotta debug other parts first
+model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
+  # run the model n_sims times to get a modelled dataset based on 
+  # inputted parameters
+  model_data_full=data.frame()
+  
+  
+  
   for(sim in 1:n_sims){
-    print(paste("sim ",sim))
+    if(sim%%10==0){
+      print(paste("sim ",sim))
+    }
     
-    model_list=c(Make_EWA_model("1",p_m,psd,choice_prob_data),
-                 Make_EWA_model("2",p_m,psd,choice_prob_data),
-                 Make_EWA_model("3",p_m,psd,choice_prob_data),
-                 Make_EWA_model("4",p_m,psd,choice_prob_data))
+    model_list=c(Make_EWA_model("1",parameter_means,parameter_sds,choice_data),
+                 Make_EWA_model("2",parameter_means,parameter_sds,choice_data),
+                 Make_EWA_model("3",parameter_means,parameter_sds,choice_data),
+                 Make_EWA_model("4",parameter_means,parameter_sds,choice_data))
     
     for(round in 1:20){
       #print(paste("    round ",round))
@@ -132,67 +124,122 @@ if(TRUE){
       }
     }
   }
-
+  # h_dat is the corresponding dataframe to model_data
+  # we're going to combine them below
+  model_data=model_data_full[,1:4]
+  # lets check correlation & rmse between corresponding average choice in rounds
+  # for human and model
+  
+  # ideally:
+  # agent_type, round, mean, se
+  
+  # average across groups and players
+  # to get average choice made for each round for humans and models
+  # this dataframe combines h_dat and model_data
+  compare_dat=rbind(
+    data.frame(unique(select(mutate(group_by(model_data, round),
+                                    mean=mean(own_choice),
+                                    se=sd(own_choice)/sqrt(length(own_choice)),
+                                    agent_type="model"
+                                    ),
+                             agent_type,round,mean,se))
+               ),
+    data.frame(unique(select(mutate(group_by(h_dat, round),
+                                    mean=mean(choice),
+                                    se=sd(choice)/sqrt(length(choice)),
+                                    agent_type="human"
+                                    ),
+                             agent_type,round,mean,se))
+               )
+  )
+  
+  
+  # if you really want to look at an individual parameter set
+  # and its fit to human data
+  if(drawgraphs){
+    # look at it visually
+    ggplot(compare_dat)+
+      geom_line(aes(x=round, y=mean, color=agent_type))+
+      geom_errorbar(mapping=aes(x=round, ymin=mean-se, ymax=mean+se, color=agent_type), 
+                    width=.2)+
+      labs("average choice")+
+      labs(title="average choice by round for human and model agents",
+           caption="error bars represent standard error")
+  }
+  
+  
+  # mean(model_data_full$delta)
+  
+  
+  # dataframe to hold info about parameters and model fit
+  # delta, rho, lambda, phi, initial_choice_data, correlation, rmse
+  return(
+    data.frame( delta=mean(model_data_full$delta),
+                rho=mean(model_data_full$rho),
+                lambda=mean(model_data_full$lambda),
+                phi=mean(model_data_full$phi),
+                initial_choice_data=I(list(choice_prob_data)),
+                # correlation=cor(compare_dat[compare_dat$agent_type=="human",]$mean, 
+                #                 compare_dat[compare_dat$agent_type=="model",]$mean),
+                rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
+                                   compare_dat[compare_dat$agent_type=="model",]$mean)^2))
+         )
+  )
 }
 
 
-
-
-# now we read in the actual data
-
+setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_model")
 source("Data_Analysis.R")
 # this should give us JUST d1a as a dataframe object
-
 # game, subject, round, choice
-
 human_data=data.frame(group=d1a$Group, subject=d1a$Subject_ID, round=d1a$Round, choice=d1a$Effort_level)
-model_data=model_data_full[,1:4]
-# lets check correlation & rmse between corresponding average choice in rounds
-# for human and model
-
-# ideally:
-# agent_type, round, mean, se
-
-# average across groups and players
-# to get average choice made for each round for humans and models
-compare_dat=rbind(
-  data.frame(unique(select(mutate(group_by(model_data, round),
-                                  mean=mean(own_choice),
-                                  se=sd(own_choice)/sqrt(length(own_choice)),
-                                  agent_type="model"
-                                  ),
-                           agent_type,round,mean,se))
-             ),
-  data.frame(unique(select(mutate(group_by(human_data, round),
-                                  mean=mean(choice),
-                                  se=sd(choice)/sqrt(length(choice)),
-                                  agent_type="human"
-                                  ),
-                           agent_type,round,mean,se))
-             )
-)
+# this is the data we're going to compare things to
 
 
+drawgraphs=F
+
+# these are the defaults, we're going to iterate over different values for these
+# p_m, psd : parameter means, parameter sd's
+# [delta, rho, lambda, phi]
+p_m=c(1,1,1,1)
+psd=c(.01,.01,.01,.01)
+
+# initial choice probabilities based on human data
+choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
+
+# number of simulations to run
+number_of_sims=100
 
 
-# look at it visually
-ggplot(compare_dat)+
-  geom_line(aes(x=round, y=mean, color=agent_type))+
-  geom_errorbar(mapping=aes(x=round, ymin=mean-se, ymax=mean+se, color=agent_type), 
-                width=.2)+
-  labs("average choice")+
-  labs(title="average choice by round for human and model agents",
-       caption="error bars represent standard error")
+# initialize fit_data
+fit_data=data.frame()
+
+
+# loop through different parameter sets here
+
+param_means= (5:15)/10 + .001
+
+# phi of >=1 gives error
+
+for(d in param_means){
+  for(rh in param_means){
+    for(l in param_means){
+      for(ph in param_means){
+        pm=c(d,rh,l,ph)
+        print(pm)
+        fit_data=rbind(fit_data,
+                       model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
+        )
+      }
+    }
+  }
+}
+  
+View(fit_data)
 
 
 
-# correlation
-cor(compare_dat[compare_dat$agent_type=="human",]$mean, compare_dat[compare_dat$agent_type=="model",]$mean)
 
-# rmse
-# sqrt(mean((m - o)^2))
-sqrt(mean((compare_dat[compare_dat$agent_type=="human",]$mean-
-             compare_dat[compare_dat$agent_type=="model",]$mean)^2))
 
 
 
@@ -200,3 +247,10 @@ sqrt(mean((compare_dat[compare_dat$agent_type=="human",]$mean-
 # for running simulations: run 10 or so at each unique parameter values
 # for supercomputer: multithreading to speed up computation?
 # command line arguments using commandArgs, and then fork() within a shell script to run different parameters?
+
+
+# Mike's advice:
+# You might put in the code to compute a correlation/RMSD between the average data and the model results. 
+# That way you just the code return the particular combination of parameter and mode fit metrics.
+
+# Then you can just to rerun the particular model combinations on your own machine.
