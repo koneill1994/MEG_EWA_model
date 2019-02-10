@@ -198,3 +198,5 @@ sqrt(mean((compare_dat[compare_dat$agent_type=="human",]$mean-
 
 
 # for running simulations: run 10 or so at each unique parameter values
+# for supercomputer: multithreading to speed up computation?
+# command line arguments using commandArgs, and then fork() within a shell script to run different parameters?
