@@ -54,16 +54,27 @@ Make_EWA_model <- setRefClass(
         
         N               <<- rho*N_prev+1
         attraction      <<- (phi*N_prev*attraction_prev + weighted_payoff)/N
-        choice_prob     <<- exp(lambda * attraction) / sum( exp(lambda * attraction) )
         
+        # convenience code to catch examples that would be coerced to Inf
+          # i don't like it either but we have to run this on finite computers
+          # not in infinite abstract mathematical space
+        if(sum(exp(lambda * attraction)) == Inf){
+          choice_prob<<-ifelse(exp(lambda * attraction)==Inf,1,0)
+        }
+        # should probably also handle when exp(l*a)==-Inf at some point
+        else{
+          choice_prob     <<- exp(lambda * attraction) / sum( exp(lambda * attraction) )
+        }
         attraction_prev <<- attraction
         N_prev          <<- N
       }
     },
     choose= function(){
-      # this is where it is throwing an error
-      # its happening because somehow choice_prob contains an NA
-      # how to avoid this?
+      if(any(is.na(choice_prob))){
+        print("ERROR: NA in choice_prob")
+        print(.self$initFields())
+      }
+      
       own_choice        <<- sample(choices, 1,replace=T, prob=choice_prob)
       return(own_choice)
     },
@@ -96,6 +107,7 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   # run the model n_sims times to get a modelled dataset based on 
   # inputted parameters
   model_data_full=data.frame()
+  start_time=Sys.time()
   
   for(sim in 1:n_sims){
     # so we don't spam the console
@@ -170,6 +182,7 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   
   # dataframe to hold info about parameters and model fit
   # delta, rho, lambda, phi, initial_choice_data, rmse
+  # and computation time in seconds
   return(
     data.frame( delta=mean(model_data_full$delta),
                 rho=mean(model_data_full$rho),
@@ -177,22 +190,32 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
                 phi=mean(model_data_full$phi),
                 initial_choice_data=I(list(choice_prob_data)),
                 rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
-                                   compare_dat[compare_dat$agent_type=="model",]$mean)^2))
+                                   compare_dat[compare_dat$agent_type=="model",]$mean)^2)),
+                computation_time=Sys.time()-start_time
          )
   )
 }
 
 
-setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_model")
-source("Data_Analysis.R")
-# this should give us JUST d1a as a dataframe object
-
-# game, subject, round, choice
-human_data=data.frame(group=d1a$Group, subject=d1a$Subject_ID, round=d1a$Round, choice=d1a$Effort_level)
-# this is the data we're going to compare things to
-
 
 drawgraphs=F
+load_human_dat=T
+
+setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_model")
+
+# get human data to compare models to
+if(!load_human_dat){
+  source("Data_Analysis.R")
+  # this should give us JUST d1a as a dataframe object
+  
+  # game, subject, round, choice
+  human_data=data.frame(group=d1a$Group, subject=d1a$Subject_ID, round=d1a$Round, choice=d1a$Effort_level)
+  # this is the data we're going to compare things to
+  saveRDS(human_data, file="MEG_human_data.rds")
+} else{
+  # load in the human data we've prepared earlier
+  human_data=readRDS("MEG_human_data.rds")
+}
 
 # these are the defaults, we're going to iterate over different values for these
 # p_m, psd : parameter means, parameter sd's
@@ -210,7 +233,7 @@ number_of_sims=100
 fit_data=data.frame()
 
 # loop through different parameter sets here
-param_means= (0:9)/10
+param_means= (-5:15)/10
 
 for(d in param_means){
   for(rh in param_means){
@@ -228,16 +251,35 @@ for(d in param_means){
   
 View(fit_data)
 
-save(fit_data, file=paste(format(Sys.time(),"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.RData",sep=""))
+saveRDS(fit_data, file=paste(format(Sys.time(),"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.rds",sep=""))
 
 
+# k=readRDS("2019-02-11_15-56-25_EWA-fit.rds")
 
 
 
 
 # for running simulations: run 10 or so at each unique parameter values
 # for supercomputer: multithreading to speed up computation?
+
 # command line arguments using commandArgs, and then fork() within a shell script to run different parameters?
+
+
+
+# to put on the supercomputer:
+# tar.gz scp'ed onto it, unpacked to reveal:
+  # EWA_model.R (this file)
+  # RData representing the human data (do that instead of having the supercomputer run Data_Analysis.R)
+  # .sh script which will cycle through different parameter values (maybe just delta and rho?)
+  #   and run a new process to explore each of those values
+
+
+# commandArgs to start separate processes for each of several parameter sets
+
+# each process will save an EWA_fit RData file
+# when analyzing that data, put them in a tar.gz and scp them to local machine
+# create a script that will cbind them all together to get a full accounting of the space
+
 
 
 # Mike's advice:
