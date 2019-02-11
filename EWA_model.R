@@ -228,7 +228,7 @@ for(d in param_means){
   
 View(fit_data)
 
-save(fit_data, file=paste(Sys.Date(),"_EWA-fit.RData"))
+save(fit_data, file=paste(format(Sys.time(),"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.RData",sep=""))
 
 
 
