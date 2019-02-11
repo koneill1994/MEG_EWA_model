@@ -61,6 +61,9 @@ Make_EWA_model <- setRefClass(
       }
     },
     choose= function(){
+      # this is where it is throwing an error
+      # its happening because somehow choice_prob contains an NA
+      # how to avoid this?
       own_choice        <<- sample(choices, 1,replace=T, prob=choice_prob)
       return(own_choice)
     },
@@ -94,9 +97,8 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   # inputted parameters
   model_data_full=data.frame()
   
-  
-  
   for(sim in 1:n_sims){
+    # so we don't spam the console
     if(sim%%10==0){
       print(paste("sim ",sim))
     }
@@ -107,7 +109,6 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
                  Make_EWA_model("4",parameter_means,parameter_sds,choice_data))
     
     for(round in 1:20){
-      #print(paste("    round ",round))
       g_choices=c()
       # all models make their choice for this round
       for(model in model_list){
@@ -127,10 +128,8 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   # h_dat is the corresponding dataframe to model_data
   # we're going to combine them below
   model_data=model_data_full[,1:4]
-  # lets check correlation & rmse between corresponding average choice in rounds
-  # for human and model
   
-  # ideally:
+  # df columns:
   # agent_type, round, mean, se
   
   # average across groups and players
@@ -152,6 +151,8 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
                              agent_type,round,mean,se))
                )
   )
+  # reminder that for a full parameter space search
+  # SE is not necessary and a pruned version of this function should be used
   
   
   # if you really want to look at an individual parameter set
@@ -167,20 +168,14 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
            caption="error bars represent standard error")
   }
   
-  
-  # mean(model_data_full$delta)
-  
-  
   # dataframe to hold info about parameters and model fit
-  # delta, rho, lambda, phi, initial_choice_data, correlation, rmse
+  # delta, rho, lambda, phi, initial_choice_data, rmse
   return(
     data.frame( delta=mean(model_data_full$delta),
                 rho=mean(model_data_full$rho),
                 lambda=mean(model_data_full$lambda),
                 phi=mean(model_data_full$phi),
                 initial_choice_data=I(list(choice_prob_data)),
-                # correlation=cor(compare_dat[compare_dat$agent_type=="human",]$mean, 
-                #                 compare_dat[compare_dat$agent_type=="model",]$mean),
                 rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
                                    compare_dat[compare_dat$agent_type=="model",]$mean)^2))
          )
@@ -191,6 +186,7 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
 setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_model")
 source("Data_Analysis.R")
 # this should give us JUST d1a as a dataframe object
+
 # game, subject, round, choice
 human_data=data.frame(group=d1a$Group, subject=d1a$Subject_ID, round=d1a$Round, choice=d1a$Effort_level)
 # this is the data we're going to compare things to
@@ -210,16 +206,11 @@ choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
 # number of simulations to run
 number_of_sims=100
 
-
 # initialize fit_data
 fit_data=data.frame()
 
-
 # loop through different parameter sets here
-
-param_means= (5:15)/10 + .001
-
-# phi of >=1 gives error
+param_means= (0:9)/10
 
 for(d in param_means){
   for(rh in param_means){
@@ -237,7 +228,7 @@ for(d in param_means){
   
 View(fit_data)
 
-
+save(fit_data, file="EWA_fit.RData")
 
 
 
