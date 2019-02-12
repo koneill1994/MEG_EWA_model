@@ -36,7 +36,226 @@ and the methods:
 | `choose()` | Makes a choice weighted by the choice probabilities held in `choice_prob` |
 | `output_logfile()` | Returns a single-row dataframe containing the internal state of the model, mostly for debugging purposes.  `own_choice` will be grabbed from this output and used in subsequent analysis; the rest will be thrown away. |
 
-[I'm gonna talk about the algorithm in depth here in a later edit]
+Lets have a look through the update function just to know how it works.  
+
+```r
+update=function(group_choices){
+  cl_0=unique(group_choices)
+  choice_list=sample(cl_0,length(cl_0))
+
+  for(g_min in choice_list){
+    delta_n = ifelse(choices == own_choice, 1, delta )
+    max_payoff =  ((g_min - 1) * 10) + 70
+
+    payoff = ifelse( choices < g_min, ((choices - 1) * 10) + 70, max_payoff - (choices-g_min)*10 )
+
+    weighted_payoff = delta_n*payoff
+
+    N               <<- rho*N_prev+1
+    attraction      <<- (phi*N_prev*attraction_prev + weighted_payoff)/N
+
+
+    if(sum(exp(lambda * attraction)) == Inf){
+      choice_prob<<-ifelse(exp(lambda * attraction)==Inf,1,0)
+    } else if(sum(exp(lambda * attraction)) == 0){
+      choice_prob   <<- rep(1/length(attraction),length(attraction))
+    } else{
+      choice_prob   <<- exp(lambda * attraction) / sum( exp(lambda * attraction) )
+    }
+    attraction_prev <<- attraction
+    N_prev          <<- N
+  }
+},
+```
+
+Don't freak out, its not too hard.  Lets break it down.  
+
+---
+
+```r
+update=function(group_choices){
+  cl_0=unique(group_choices)
+  choice_list=sample(cl_0,length(cl_0))
+
+  for(g_min in choice_list){
+```
+
+As input, this function takes `group_choices`, the set of all choices made (strategies chosen, etc) by all players this round.  We want our model to look at the counterfactuals (this is the alteration to Camerer's original algorithm), so we want it to consider what the model's payout would be in different scenarios, not just in the scenario that actually happened.  Humans do this kind of hypothetical reasoning all the time, so its good to capture that in our model.  
+
+The hypothetical scenarios, i.e. the counterfactuals, that the model will be considering is scenarios in which the model's choice remained the same, but the minimum effort chosen would be different.  Specifically, the model should look at the payoff it would get if the minimum effort in the group is one of the choices made by one of the players.  One could argue whether or not these counterfactuals are weighted in a human's mind similarly to how actual occurences are weighted, but for simplicity's sake they will affect the model in the same way.  
+
+So, in summary, we want to go through each of the choices made, and update our choice probabilities when considering how we would have done if that choice was the minimum.  So here we go.  
+
+---
+
+```r
+cl_0=unique(group_choices)
+```
+
+Only grab the unique choices; no need to look at a choice of `5` three times if three people played a `5`.  It will give us the same outcome.  
+
+---
+
+```r
+choice_list=sample(cl_0,length(cl_0))
+```
+
+Randomize the order in which we consider each possible scenario.  One could argue that humans don't necessarily randomly look at or consider each counterfactual, but just to keep things constant and eliminate order effects, we shuffle this list.  
+
+---
+
+```r
+for(g_min in choice_list){
+```
+
+Finally, we loop through each possible counterfactual (which includes the scenario which actually occurred).  
+
+---
+
+ ```r
+delta_n = ifelse(choices == own_choice, 1, delta )
+max_payoff =  ((g_min - 1) * 10) + 70
+
+payoff = ifelse( choices < g_min, ((choices - 1) * 10) + 70, max_payoff - (choices-g_min)*10 )
+
+weighted_payoff = delta_n*payoff
+
+N               <<- rho*N_prev+1
+attraction      <<- (phi*N_prev*attraction_prev + weighted_payoff)/N
+```
+
+Next we do the bulk of our internal state manipulation.  
+
+---
+
+```r
+delta_n = ifelse(choices == own_choice, 1, delta )
+```
+
+If the choice we're considering is our own choice, set `delta_n` to 1, otherwise set it to our `delta` parameter value.  Consult Camerer on why we do this, but we're setting this so we know what to multiply our payoffs against to get our weighted payoffs.  
+
+---
+
+```r
+max_payoff =  ((g_min - 1) * 10) + 70
+payoff = ifelse( choices < g_min, ((choices - 1) * 10) + 70, max_payoff - (choices-g_min)*10 )
+```
+
+This is our payoff function.  In future versions of the model, the payoff function will be passed to the model as an argument; as it is now, we've hardcoded the MEG payoff function.  
+
+---
+
+```r
+weighted_payoff = delta_n*payoff
+```
+
+This gives us our weighted payoffs, which we will turn into attractions via:
+
+```r
+N               <<- rho*N_prev+1
+attraction      <<- (phi*N_prev*attraction_prev + weighted_payoff)/N
+```
+
+---
+
+```r
+if(sum(exp(lambda * attraction)) == Inf){
+  choice_prob<<-ifelse(exp(lambda * attraction)==Inf,1,0) # 2
+} else if(sum(exp(lambda * attraction)) == 0){
+  choice_prob   <<- rep(1/length(attraction),length(attraction)) # 3
+} else{
+  choice_prob   <<- exp(lambda * attraction) / sum( exp(lambda * attraction) ) # 1
+}
+```
+
+This is the part that gets us our choice probabilities, based on our attractions and lambda.  It makes most sense for me to explain this out of the order given in the code, so I'm gonna do it the order commented after the lines above.  
+
+---
+
+```r
+choice_prob   <<- exp(lambda * attraction) / sum( exp(lambda * attraction) ) # 1
+```
+
+Easy stuff, right?  This gives us the probability of choosing any given option.  Because we have an item in a list divided by the sum of items in that list, they will all add up to 1.  That way we have a nice and simple way to get weighted probabilities over a choice list.  This code will get you where you want to go in 99% percent of cases.  In the remaining 1% though, we have to get a bit creative.  
+
+---
+
+```r
+if(sum(exp(lambda * attraction)) == Inf){
+  choice_prob<<-ifelse(exp(lambda * attraction)==Inf,1,0) # 2
+}
+```
+
+Now if you're like me, the mathematical part of your brain shudders and wonders what sort of madman would compare a finite number against infinity.  Well I am that madman, and the exponential function made me this way.  
+
+Since we are running this on a finite computer, we don't have unlimited space to play around with.  There's only so big of a number you can toss around before your computer runs out of memory to hold that number.  On my machine at least, you can only count up to about `1.8*10^308` before R says "Screw it, just call it infinite, its too big for me to do math on it."  
+
+Since the exponential function gets real big real fast, there's a point where a seemingly modest attraction value like `6000` will exponentiate somewhere above R's cutoff value, and R will classify it as `Inf` and refuse to give any more detail.  So to deal with these situations where the values get "effectively" infinite, we have to use some logic to get around it.  For example:
+
+```r
+x=c(10,10,10,6000,10,10)
+exp(x)/sum(exp(x))
+```
+
+`x[4]` gives us `Inf/Inf` which gives us `NaN`, which isn't really a useful result.  But if we think about it, `x[4]`'s attraction is so astronomically large in comparison to the other attractions, its extremely unlikely anything but `x[4]` will be picked.  Remember, we're dealing with exponents here; its not `6000/10 = 600` times more likely to get picked, its `exp(6000)/exp(10)` times more likely to get picked, which is `exp(5990)` times more likely.  That number is monstrously, unfathomably large, its basically not even worth considering the other alternatives.  
+
+So in these situations, we break the mathematical elegance for ease of computation.  
+
+```r
+if(sum(exp(lambda * attraction)) == Inf){
+```
+
+Check to see if the sum of `exp(lambda*attraction)` is equal to infinity, which would indicate that there is an infinite value somewhere in there.  
+
+```r
+choice_prob<<-ifelse(exp(lambda * attraction)==Inf,1,0) # 2
+```
+
+The choices which have effectively infinite exponentiated attraction are set to 1, and all others are set to 0.  You may complain that probabilities can't be exactly 1 or 0, but don't worry, the quantities that separate .99999... and 0.0000...001 from 1 and 0 are just too small for the computer to keep track of, just like `exp(6000)` is too big for the computer to keep track of.  In theory there's a difference, but in practice there might as well not be.  
+
+---
+
+```r
+else if(sum(exp(lambda * attraction)) == 0){
+  choice_prob   <<- rep(1/length(attraction),length(attraction)) # 3
+}
+```
+
+With the above explanation out of the way, this one is pretty simple.  The MEG doesn't have negative payoffs, but it is possible to have negative payoffs in theory within the EWA model.  The normal math will still work out if there is at least one non-negative payoff.  For `y=exp(x)`, as x nears `-Inf`, y nears `0`.  So the sum on the bottom will still be something other than zero, giving a normal answer.  Observe:
+
+```r
+x=c(10,10,10,-6000,10,10)
+exp(x)/sum(exp(x))
+# [1] 0.2 0.2 0.2 0.0 0.2 0.2
+```
+
+We only run into trouble when all of the attraction values near `-Inf`.  
+
+```r
+x=c(-6000,-6000,-6000,-6000,-6000,-6000)
+exp(x)/sum(exp(x))
+```
+
+We end up with a bunch of `0/0`'s, which evaluate to `NaN`, since they divide by `0`.  But if you think about it, if you are so massively disincentivized to choose any possible option, to the extent that modern computers can't even evaluate what you should do, then you should probably quit playing that game.  But since you can't (since quitting the game would in and of itself count as a strategy), you might as well just choose randomly.  Believe me, whatever you choose doesn't matter.  They're all gonna suck.  
+
+```r
+choice_prob   <<- rep(1/length(attraction),length(attraction)) # 3
+```
+
+---
+
+Lastly, we have this:
+
+```r
+attraction_prev <<- attraction
+N_prev          <<- N
+```
+
+This one is fairly trivial.  These variables represent the values from last round, so we might as well set them at the end of this round.  We're gonna want them later.  
+
+I should also take this opportunity to point out that we're using `<<-` instead of `<-` or `=` here.  `<<-` is the "non-local variable assignment operator" in R, which means we have to use it when we're setting variables outside of our current [scope](https://en.wikipedia.org/wiki/Scope_(computer_science)).  Normally this doesn't matter in R, because almost all values in R are passed [by value, not by reference](https://stackoverflow.com/questions/373419/whats-the-difference-between-passing-by-reference-vs-passing-by-value).  Reference classes, as would be expected by their name, work differently.  When we run things in a member method of a reference class, we want to be setting variables in the environment of the instance itself, not in the environment of the function.  If we don't use this special operator, we would create local variables in the function's environment, which will be de-referenced and garbage collected when that function finished computation.  
+
+Long story short, when setting fields in a reference class, don't forget to use `<<-` and not `<-` or `=`; otherwise you won't change the values you're trying to.  
 
 ## The run function
 
