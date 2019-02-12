@@ -3,6 +3,9 @@
 library(dplyr)
 library(truncnorm)
 library(ggplot2)
+library(foreach)
+library(doFuture)
+
 
 Make_EWA_model <- setRefClass(
   "EWA_Model",
@@ -55,26 +58,25 @@ Make_EWA_model <- setRefClass(
         N               <<- rho*N_prev+1
         attraction      <<- (phi*N_prev*attraction_prev + weighted_payoff)/N
         
-        # convenience code to catch examples that would be coerced to Inf
-          # i don't like it either but we have to run this on finite computers
-          # not in infinite abstract mathematical space
+
         if(sum(exp(lambda * attraction)) == Inf){
+          # convenience code to catch examples that would be coerced to Inf
+          #   i don't like it either but we have to run this on finite computers
+          #   not in infinite abstract mathematical space
           choice_prob<<-ifelse(exp(lambda * attraction)==Inf,1,0)
-        }
-        # should probably also handle when exp(l*a)==-Inf at some point
-        else{
-          choice_prob     <<- exp(lambda * attraction) / sum( exp(lambda * attraction) )
+        } else if(sum(exp(lambda * attraction)) == 0){
+          # if somehow all the attractions are so far negative that they
+          #   all exponentiate as -Inf, just make choices randomly
+          choice_prob   <<- rep(1/length(attraction),length(attraction))
+        } else{
+          # normal EWA operation
+          choice_prob   <<- exp(lambda * attraction) / sum( exp(lambda * attraction) )
         }
         attraction_prev <<- attraction
         N_prev          <<- N
       }
     },
     choose= function(){
-      if(any(is.na(choice_prob))){
-        print("ERROR: NA in choice_prob")
-        print(.self$initFields())
-      }
-      
       own_choice        <<- sample(choices, 1,replace=T, prob=choice_prob)
       return(own_choice)
     },
@@ -111,10 +113,9 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   
   for(sim in 1:n_sims){
     # so we don't spam the console
-    if(sim%%10==0){
+    if(sim%%10==0 & verbose){
       print(paste("sim ",sim))
     }
-    
     model_list=c(Make_EWA_model("1",parameter_means,parameter_sds,choice_data),
                  Make_EWA_model("2",parameter_means,parameter_sds,choice_data),
                  Make_EWA_model("3",parameter_means,parameter_sds,choice_data),
@@ -150,17 +151,17 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   compare_dat=rbind(
     data.frame(unique(select(mutate(group_by(model_data, round),
                                     mean=mean(own_choice),
-                                    se=sd(own_choice)/sqrt(length(own_choice)),
+                                    #se=sd(own_choice)/sqrt(length(own_choice)),
                                     agent_type="model"
                                     ),
-                             agent_type,round,mean,se))
+                             agent_type,round,mean))
                ),
     data.frame(unique(select(mutate(group_by(h_dat, round),
                                     mean=mean(choice),
-                                    se=sd(choice)/sqrt(length(choice)),
+                                    #se=sd(choice)/sqrt(length(choice)),
                                     agent_type="human"
                                     ),
-                             agent_type,round,mean,se))
+                             agent_type,round,mean))
                )
   )
   # reminder that for a full parameter space search
@@ -169,16 +170,16 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   
   # if you really want to look at an individual parameter set
   # and its fit to human data
-  if(drawgraphs){
-    # look at it visually
-    ggplot(compare_dat)+
-      geom_line(aes(x=round, y=mean, color=agent_type))+
-      geom_errorbar(mapping=aes(x=round, ymin=mean-se, ymax=mean+se, color=agent_type), 
-                    width=.2)+
-      labs("average choice")+
-      labs(title="average choice by round for human and model agents",
-           caption="error bars represent standard error")
-  }
+  # if(drawgraphs){
+  #   # look at it visually
+  #   ggplot(compare_dat)+
+  #     geom_line(aes(x=round, y=mean, color=agent_type))+
+  #     geom_errorbar(mapping=aes(x=round, ymin=mean-se, ymax=mean+se, color=agent_type), 
+  #                   width=.2)+
+  #     labs("average choice")+
+  #     labs(title="average choice by round for human and model agents",
+  #          caption="error bars represent standard error")
+  # }
   
   # dataframe to hold info about parameters and model fit
   # delta, rho, lambda, phi, initial_choice_data, rmse
@@ -200,6 +201,7 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
 
 drawgraphs=F
 load_human_dat=T
+verbose=F
 
 setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_model")
 
@@ -229,27 +231,38 @@ choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
 # number of simulations to run
 number_of_sims=100
 
-# initialize fit_data
-fit_data=data.frame()
-
 # loop through different parameter sets here
-param_means= (-5:15)/10
+param_means= (0:10)/10
 
-for(d in param_means){
-  for(rh in param_means){
-    for(l in param_means){
-      for(ph in param_means){
-        pm=c(d,rh,l,ph)
-        print(pm)
-        fit_data=rbind(fit_data,
-                       model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
-        )
-      }
-    }
-  }
-}
-  
-View(fit_data)
+registerDoFuture()
+
+fit_data= foreach(d=param_means, .combine=rbind) %:%
+          foreach(rh=param_means, .combine=rbind) %:%
+          foreach(l=param_means, .combine=rbind) %:%
+          foreach(ph=param_means, .combine=rbind) %dopar% {
+            pm=c(d,rh,l,ph)
+            if(verbose) print(pm)
+            model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
+          }
+
+
+# this is linear, but we want parallel
+# for(d in param_means){
+#   for(rh in param_means){
+#     for(l in param_means){
+#       for(ph in param_means){
+#         pm=c(d,rh,l,ph)
+#         if(verbose) print(pm)
+#         fit_data=rbind(fit_data,
+#                        model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
+#         )
+#       }
+#     }
+#   }
+# }
+
+
+# View(fit_data)
 
 saveRDS(fit_data, file=paste(format(Sys.time(),"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.rds",sep=""))
 
@@ -259,28 +272,41 @@ saveRDS(fit_data, file=paste(format(Sys.time(),"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.rd
 
 
 
-# for running simulations: run 10 or so at each unique parameter values
 # for supercomputer: multithreading to speed up computation?
 
-# command line arguments using commandArgs, and then fork() within a shell script to run different parameters?
+# quick time estimate
+# takes ~ 30s to run a batch of simulations
+# and if we test out 10^4 parameters
+# it'll take 30000 seconds
+# or 8.3 processor-hours
 
+# use parallel package? 
+# https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/ 
+# .combine = rbind to combine the rows into the final dataframe
 
+# efficient nested foreach using %:%
+# "The operator turns multiple foreach loops into a single loop, 
+#   creating a single stream of tasks that can all be executed in parallel."
+
+# library(doParallel)
+# library(foreach)
+# so use nested foreach with %:%
+# and a %dopar% at the end
+# with .combine=rbind
+# within the nested loop:
+#   run the sim
+#   return the dataframe row
+#   .combine=rbind will rbind them together
+# and assign them to whatever you assign the result of the foreach loop to
+# which will return the filled dataframe that we want
 
 # to put on the supercomputer:
 # tar.gz scp'ed onto it, unpacked to reveal:
   # EWA_model.R (this file)
   # RData representing the human data (do that instead of having the supercomputer run Data_Analysis.R)
-  # .sh script which will cycle through different parameter values (maybe just delta and rho?)
-  #   and run a new process to explore each of those values
 
-
-# commandArgs to start separate processes for each of several parameter sets
-
-# each process will save an EWA_fit RData file
-# when analyzing that data, put them in a tar.gz and scp them to local machine
-# create a script that will cbind them all together to get a full accounting of the space
-
-
+# scp back the fit_data.rds file
+# analyze that
 
 # Mike's advice:
 # You might put in the code to compute a correlation/RMSD between the average data and the model results. 
