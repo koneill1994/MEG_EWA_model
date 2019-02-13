@@ -5,3 +5,4 @@ Minimum_Effort_Game_EWA.R
 *.png
 *.RData
 *.rds
+!MEG_human_data.rds
