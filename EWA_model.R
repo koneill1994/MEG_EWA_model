@@ -1,7 +1,6 @@
 # EWA Model class
 
 library(dplyr)
-library(truncnorm)
 library(ggplot2)
 library(foreach)
 library(doParallel)
@@ -34,10 +33,10 @@ Make_EWA_model <- setRefClass(
       attraction_prev   <<- rep(0,7)
       N                 <<- rep(  0, length(choices))
       N_prev            <<- rep(  0, length(choices))
-      delta             <<- rtruncnorm(1, a=0, b=1, mean = p_mean[1], sd = p_sd[1]  ) 
-      rho               <<- rtruncnorm(1, a=0, b=1, mean = p_mean[2], sd = p_sd[2]  ) 
-      lambda            <<- rtruncnorm(1, a=0, b=1, mean = p_mean[3], sd = p_sd[3]  ) 
-      phi               <<- rtruncnorm(1, a=0, b=1, mean = p_mean[4], sd = p_sd[4]  ) 
+      delta             <<- min(max(rnorm(1, mean = p_mean[1], sd = p_sd[1]),0),1)
+      rho               <<- min(max(rnorm(1, mean = p_mean[2], sd = p_sd[2]),0),1)
+      lambda            <<- min(max(rnorm(1, mean = p_mean[3], sd = p_sd[3]),0),1)
+      phi               <<- min(max(rnorm(1, mean = p_mean[4], sd = p_sd[4]),0),1)
       choice_prob       <<- initial_choice_prob
       own_choice        <<- NaN # set it to something invalid initially for sanity testing
     },
@@ -184,6 +183,8 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   # dataframe to hold info about parameters and model fit
   # delta, rho, lambda, phi, initial_choice_data, rmse
   # and computation time in seconds
+  
+  # (add start time and end time to this as well)
   return(
     data.frame( delta=mean(model_data_full$delta),
                 rho=mean(model_data_full$rho),
@@ -201,9 +202,9 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
 
 drawgraphs=F
 load_human_dat=T
-verbose=F
+verbose=T
 
-setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_model")
+setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
 
 # get human data to compare models to
 if(!load_human_dat){
@@ -229,20 +230,19 @@ psd=c(.01,.01,.01,.01)
 choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
 
 # number of simulations to run
-number_of_sims=100
+number_of_sims=10
 
 # loop through different parameter sets here
 param_means= (0:1)/10
 
-registerDoParallel()
+registerDoParallel(detectCores()-1)
 
 getDoParWorkers()
 
-
-fit_data= foreach(d=param_means, .combine=rbind) %:%
-          foreach(rh=param_means, .combine=rbind) %:%
-          foreach(l=param_means, .combine=rbind) %:%
-          foreach(ph=param_means, .combine=rbind) %dopar% {
+fit_data= foreach(d=param_means, .combine=rbind, .inorder=F) %:%
+          foreach(rh=param_means, .combine=rbind, .inorder=F) %:%
+          foreach(l=param_means, .combine=rbind, .inorder=F) %:%
+          foreach(ph=param_means, .combine=rbind, .inorder=F) %dopar% {
             pm=c(d,rh,l,ph)
             if(verbose) print(pm)
             model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
