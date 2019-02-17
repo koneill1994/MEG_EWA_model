@@ -5,7 +5,7 @@ library(ggplot2)
 library(foreach)
 library(doParallel)
 
-cl=makeCluster(detectCores()-1)
+cl=makeCluster(detectCores(logical = FALSE))
 
 
 clusterEvalQ(cl,{
@@ -115,10 +115,6 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   start_time=Sys.time()
   
   for(sim in 1:n_sims){
-    # so we don't spam the console
-    if(sim%%10==0 & verbose){
-      print(paste("sim ",sim))
-    }
     model_list=c(Make_EWA_model("1",parameter_means,parameter_sds,choice_data),
                  Make_EWA_model("2",parameter_means,parameter_sds,choice_data),
                  Make_EWA_model("3",parameter_means,parameter_sds,choice_data),
@@ -154,39 +150,22 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
   compare_dat=rbind(
     data.frame(unique(select(mutate(group_by(model_data, round),
                                     mean=mean(own_choice),
-                                    #se=sd(own_choice)/sqrt(length(own_choice)),
                                     agent_type="model"
                                     ),
                              agent_type,round,mean))
                ),
     data.frame(unique(select(mutate(group_by(h_dat, round),
                                     mean=mean(choice),
-                                    #se=sd(choice)/sqrt(length(choice)),
                                     agent_type="human"
                                     ),
                              agent_type,round,mean))
                )
   )
-  # reminder that for a full parameter space search
-  # SE is not necessary and a pruned version of this function should be used
-  
-  
-  # if you really want to look at an individual parameter set
-  # and its fit to human data
-  # if(drawgraphs){
-  #   # look at it visually
-  #   ggplot(compare_dat)+
-  #     geom_line(aes(x=round, y=mean, color=agent_type))+
-  #     geom_errorbar(mapping=aes(x=round, ymin=mean-se, ymax=mean+se, color=agent_type), 
-  #                   width=.2)+
-  #     labs("average choice")+
-  #     labs(title="average choice by round for human and model agents",
-  #          caption="error bars represent standard error")
-  # }
-  
+
   # dataframe to hold info about parameters and model fit
   # delta, rho, lambda, phi, initial_choice_data, rmse
   # and computation time in seconds
+  end_time=Sys.time()
   
   # (add start time and end time to this as well)
   return(
@@ -197,7 +176,9 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
                 initial_choice_data=I(list(choice_prob_data)),
                 rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
                                    compare_dat[compare_dat$agent_type=="model",]$mean)^2)),
-                computation_time=Sys.time()-start_time
+                start=start_time,
+                end=end_time,
+                computation_time=end_time-start_time
          )
   )
 }
@@ -206,7 +187,6 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
 
 drawgraphs=F
 load_human_dat=T
-verbose=T
 
 setwd("F:/Downloads/MEG_EWA_model-master (1)/MEG_EWA_model-master")
 
@@ -234,10 +214,12 @@ psd=c(.01,.01,.01,.01)
 choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
 
 # number of simulations to run
-number_of_sims=10
+number_of_sims=100
+
+num_means=5
 
 # loop through different parameter sets here
-param_means= (0:1)/10
+param_means= seq(0,1,by=1/num_means)
 
 
 
@@ -255,25 +237,10 @@ fit_data= foreach(d=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr"
           foreach(l=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %:%
           foreach(ph=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %dopar% {
             pm=c(d,rh,l,ph)
-            if(verbose) print(pm)
             model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
           }
 
 
-# this is linear, but we want parallel
-# for(d in param_means){
-#   for(rh in param_means){
-#     for(l in param_means){
-#       for(ph in param_means){
-#         pm=c(d,rh,l,ph)
-#         if(verbose) print(pm)
-#         fit_data=rbind(fit_data,
-#                        model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
-#         )
-#       }
-#     }
-#   }
-# }
 
 
 # View(fit_data)
