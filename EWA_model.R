@@ -254,10 +254,6 @@ fit_data= foreach(d=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr"
           foreach(rh=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %:%
           foreach(l=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %:%
           foreach(ph=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %dopar% {
-            pm=c(d,rh,l,ph)
-            if(verbose) print(pm)
-            model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
-          }
 
 
 # this is linear, but we want parallel
