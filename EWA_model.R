@@ -83,6 +83,12 @@ clusterEvalQ(cl,{
         }
       },
       choose= function(){
+        # too few positive probabilities
+        # if they're all 0 just choose randomly
+        # if this triggers its a sign something went wrong
+        if(sum(choice_prob==0)){
+          own_choice      <<- sample(choices, 1,replace=T)
+        }
         own_choice        <<- sample(choices, 1,replace=T, prob=choice_prob)
         return(own_choice)
       },
@@ -221,7 +227,7 @@ number_of_sims=75
 
 # number of means to search
 # i.e. resolution of the parameter space
-num_means=5
+num_means=3
 
 # loop through different parameter sets here
 param_means= seq(0,1,by=1/num_means)
@@ -244,11 +250,11 @@ fit_data= foreach(d=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr"
 program_end_time=Sys.time()
 
 #save the fit data (IMPORTANT)
-saveRDS(fit_data, file=paste(format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.rds",sep=""))
+saveRDS(fit_data, file=paste("/data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.rds",sep=""))
 
 {
   # write a log of the variables to keep track of config 
-  fileConn=file(paste(format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_configLog.tsv",sep=""))
+  fileConn=file(paste("/data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_configLog.tsv",sep=""))
   writeLines(c(paste("program_start_time",program_start_time,sep="\t"),
                paste("program_end_time",program_end_time,sep="\t"),
                paste("num_workers",getDoParWorkers(),sep="\t"),
