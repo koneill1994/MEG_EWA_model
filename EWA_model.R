@@ -256,7 +256,9 @@ saveRDS(fit_data, file=paste(format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_EWA-
                paste("means",toString(param_means),sep="\t"),
                paste("sd's",toString(psd),sep="\t"),
                paste("choice_prob_data",toString(choice_prob_data),sep="\t"),
-               paste("number_of_sims",number_of_sims,sep="\t")
+               paste("number_of_sims",number_of_sims,sep="\t"),
+               paste("r_version",R.version.string,sep="\t"),
+               paste("pc_info",toString(Sys.info()),sep="\t")
                ), 
              fileConn)
   close(fileConn)
