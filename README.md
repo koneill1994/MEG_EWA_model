@@ -981,3 +981,12 @@ The fourth and final `%dopar%` will spin off 3 children each, leading to a total
 We end up with a bunch of processes which are doing nothing but wait for their children processes to finish, which isn't really useful or necessary, and will slow things down and eat up memory without offering anything useful.  Using `%:%`, we have the main process as the parent, and we have all of our allocated child processes running the stuff we want them to.  
 
 **Last thing to mention:** foreach loops have a return value.  Setting the `.combine` argument to `rbind` will perform the rbind operation to each value returned from the code inside, which in this case is the output of `model_run()`.  And if you recall above, the output of `model_run()` is a single-row dataframe containing all we want to know about the parameters of that model run and its fit to the human data.  So when this code finishes it will sew all of our model outputs in a nice neat dataframe, showing us the shape of the goodness-of-fit space, and letting us figure out which parameters fit the human data best.  
+
+---
+
+A note on hyperthreading as well.  You may wonder why the code now uses ```cl=makeCluster(detectCores(logical = FALSE))``` to determine how many cores to use.  Setting ```logical``` to ```FALSE``` will only create as many threads as there are physical cores, not logical cores.  For example, my Ryzen 5 1600X procesor has 6 physical cores, but each contains 2 logical cores, for a total of 12 logical cores.  These logical cores allow more operations to be done on a single physical core through a process called hyperthreading.  However the efficacy of this is heavily dependent on the type of operation being done, and it does not appear that R processes in general benefit from hyperthreading.  
+
+https://www.r-bloggers.com/hyperthreading-ftw-testing-parallelization-performance-in-r/
+https://heuristically.wordpress.com/2011/06/27/benchmarking-r-revolution-r-and-hyperthreading-for-data-mining/
+
+So because of this, we save ourselves the headache of filling each logical core with a process, and just run one r process per physical core, as running on all logical cores is unnecessary and likely won't grant a significant performance difference.  

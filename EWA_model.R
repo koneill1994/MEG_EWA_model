@@ -1,13 +1,17 @@
 # EWA Model class
 
+program_start_time=Sys.time()
+
 library(dplyr)
 library(ggplot2)
 library(foreach)
 library(doParallel)
 
+# fiddle with this in case it doesn't work on your machine
 cl=makeCluster(detectCores(logical = FALSE))
 
-
+# had to do this to get it to run in parallel on windows
+# don't know the implications for unix
 clusterEvalQ(cl,{
   Make_EWA_model <- setRefClass(
     "EWA_Model",
@@ -185,10 +189,10 @@ model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
 
 
 
-drawgraphs=F
 load_human_dat=T
 
-setwd("F:/Downloads/MEG_EWA_model-master (1)/MEG_EWA_model-master")
+# set this to the folder comtaining MEG_human_data.rds or Data_Analysis.R
+setwd("E:/Libraries/r projects/MEG_EWA_model-master")
 
 # get human data to compare models to
 if(!load_human_dat){
@@ -204,34 +208,30 @@ if(!load_human_dat){
   human_data=readRDS("MEG_human_data.rds")
 }
 
-# these are the defaults, we're going to iterate over different values for these
-# p_m, psd : parameter means, parameter sd's
+# these are the defaults
+# parameter sd's
 # [delta, rho, lambda, phi]
-p_m=c(1,1,1,1)
 psd=c(.01,.01,.01,.01)
 
 # initial choice probabilities based on human data
 choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
 
 # number of simulations to run
-number_of_sims=100
+number_of_sims=75
 
+# number of means to search
+# i.e. resolution of the parameter space
 num_means=5
 
 # loop through different parameter sets here
 param_means= seq(0,1,by=1/num_means)
 
-
-
-
-
+# set up the parallel computation
 registerDoParallel(cl)
-
 getDoParWorkers()
 
-
-
-
+# the heart of the whole thing: the exhaustive parameter space search
+# this part should take minutes to hours depending on num_means and number_of_sims
 fit_data= foreach(d=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %:%
           foreach(rh=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %:%
           foreach(l=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %:%
@@ -241,60 +241,26 @@ fit_data= foreach(d=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr"
           }
 
 
+program_end_time=Sys.time()
 
+#save the fit data (IMPORTANT)
+saveRDS(fit_data, file=paste(format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.rds",sep=""))
 
-# View(fit_data)
-
-saveRDS(fit_data, file=paste(format(Sys.time(),"%Y-%m-%d_%H-%M-%S"),"_EWA-fit.rds",sep=""))
-
-
+{
+  # write a log of the variables to keep track of config 
+  fileConn=file(paste(format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_configLog.tsv",sep=""))
+  writeLines(c(paste("program_start_time",program_start_time,sep="\t"),
+               paste("program_end_time",program_end_time,sep="\t"),
+               paste("num_workers",getDoParWorkers(),sep="\t"),
+               paste("num_means",num_means,sep="\t"),
+               paste("means",toString(param_means),sep="\t"),
+               paste("sd's",toString(psd),sep="\t"),
+               paste("choice_prob_data",toString(choice_prob_data),sep="\t"),
+               paste("number_of_sims",number_of_sims,sep="\t")
+               ), 
+             fileConn)
+  close(fileConn)
+}
 
 stopCluster(cl)
 
-
-# k=readRDS("2019-02-11_15-56-25_EWA-fit.rds")
-
-
-
-
-# for supercomputer: multithreading to speed up computation?
-
-# quick time estimate
-# takes ~ 30s to run a batch of simulations
-# and if we test out 10^4 parameters
-# it'll take 30000 seconds
-# or 8.3 processor-hours
-
-# use parallel package? 
-# https://www.r-bloggers.com/how-to-go-parallel-in-r-basics-tips/ 
-# .combine = rbind to combine the rows into the final dataframe
-
-# efficient nested foreach using %:%
-# "The operator turns multiple foreach loops into a single loop, 
-#   creating a single stream of tasks that can all be executed in parallel."
-
-# library(doParallel)
-# library(foreach)
-# so use nested foreach with %:%
-# and a %dopar% at the end
-# with .combine=rbind
-# within the nested loop:
-#   run the sim
-#   return the dataframe row
-#   .combine=rbind will rbind them together
-# and assign them to whatever you assign the result of the foreach loop to
-# which will return the filled dataframe that we want
-
-# to put on the supercomputer:
-# tar.gz scp'ed onto it, unpacked to reveal:
-  # EWA_model.R (this file)
-  # RData representing the human data (do that instead of having the supercomputer run Data_Analysis.R)
-
-# scp back the fit_data.rds file
-# analyze that
-
-# Mike's advice:
-# You might put in the code to compute a correlation/RMSD between the average data and the model results. 
-# That way you just the code return the particular combination of parameter and mode fit metrics.
-
-# Then you can just to rerun the particular model combinations on your own machine.
