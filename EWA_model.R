@@ -94,7 +94,7 @@ clusterEvalQ(cl,{
         # too few positive probabilities
         # if they're all 0 just choose randomly
         # if this triggers its a sign something went wrong
-        if(sum(choice_prob==0)){
+        if(sum(choice_prob)==0){
           own_choice      <<- sample(choices, 1,replace=T)
         }
         own_choice        <<- sample(choices, 1,replace=T, prob=choice_prob)
