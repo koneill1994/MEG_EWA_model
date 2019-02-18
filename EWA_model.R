@@ -65,16 +65,24 @@ clusterEvalQ(cl,{
           attraction      <<- (phi*N_prev*attraction_prev + weighted_payoff)/N
           
   
-          if(sum(exp(lambda * attraction)) == Inf){
+          if(sum(is.infinite(exp(lambda * attraction)))){
             # convenience code to catch examples that would be coerced to Inf
             #   i don't like it either but we have to run this on finite computers
             #   not in infinite abstract mathematical space
+            
+            # assumption: a value of Inf will be infinitely greater than the other values
+            # not tenable?
             choice_prob<<-ifelse(exp(lambda * attraction)==Inf,1,0)
           } else if(sum(exp(lambda * attraction)) == 0){
             # if somehow all the attractions are so far negative that they
             #   all exponentiate as -Inf, just make choices randomly
             choice_prob   <<- rep(1/length(attraction),length(attraction))
-          } else{
+          } else if(sum(exp(lambda * attraction)) == Inf){
+            # numbers can sum to Inf but each individually be less than Inf
+            # this should function identically to the next block except it handles Inf sum better
+            la=exp(lambda * attraction)/max(exp(lambda * attraction))
+            choice_prob   <<- la/sum(la)
+          } else {
             # normal EWA operation
             choice_prob   <<- exp(lambda * attraction) / sum( exp(lambda * attraction) )
           }
