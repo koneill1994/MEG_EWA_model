@@ -3,9 +3,10 @@
 program_start_time=Sys.time()
 
 library(dplyr)
-library(ggplot2)
 library(foreach)
 library(doParallel)
+
+packs=c("dplyr","foreach","doParallel")
 
 # fiddle with this in case it doesn't work on your machine
 cl=makeCluster(detectCores(logical = FALSE))
@@ -156,7 +157,12 @@ clusterEvalQ(cl,{
           }
         # evaluate them all in parallel
         # df=data.frame(cbind(hc_id=id,adjacent,rmse=parApply(cl,adjacent,1,eval_function))) # just for testing
-        df=bind_rows(parApply(cl,adjacent,1,eval_function))
+        
+        # if(!is.null(cluster)){
+        #   df=bind_rows(parApply(cluster,adjacent,1,eval_function))
+        # } else {
+          df=bind_rows(apply(adjacent,1,eval_function))
+        # }
         # ^ this one is the real one
         
         # find the min or max of the rmse's
@@ -244,7 +250,36 @@ clusterEvalQ(cl,{
     return(model_run(coords, psd, choice_prob_data, number_of_sims, human_data))
   }
 
+  
+  
+  
+  
+  psd=c(.01,.01,.01,.01)
+  
+  # initial choice probabilities based on human data
+  choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
+  
+  # number of simulations to run
+  number_of_sims=75
+  
+  # number of means to search
+  # i.e. resolution of the parameter space
+  num_means=10
+  
+  # loop through different parameter sets here
+  param_means= seq(0,1,by=1/(num_means-1))
+  
+  
 })
+
+
+
+
+
+
+
+
+
 
 load_human_dat=T
 
@@ -269,24 +304,6 @@ if(!load_human_dat){
   human_data=readRDS("MEG_human_data.rds")
 }
 
-# these are the defaults, we're going to iterate over different values for these
-# p_m, psd : parameter means, parameter sd's
-# [delta, rho, lambda, phi]
-psd=c(.01,.01,.01,.01)
-
-# initial choice probabilities based on human data
-choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
-
-# number of simulations to run
-number_of_sims=75
-
-# number of means to search
-# i.e. resolution of the parameter space
-num_means=10
-
-# loop through different parameter sets here
-param_means= seq(0,1,by=1/(num_means-1))
-
 # set up the parallel computation
 registerDoParallel(cl)
 getDoParWorkers()
@@ -309,17 +326,17 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=100
-  climber_iterations=500
+  num_climbers=10
+  climber_iterations=10
   
-  step_size=.001
+  step_size=.1
   
   bounds=matrix(rep(c(0,1),each=4), nrow=4)
   
-  hc_dat = foreach(climber=1:num_climbers, .combine=rbind, .inorder=F) %dopar% {
+  hc_dat = foreach(climber=1:num_climbers, .combine=rbind, .inorder=F, .packages=packs) %dopar% {
     hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds)
     
-    foreach(it=1:climber_iterations, .combine=rbind, .inorder=F) %dor% {
+    foreach(it=1:climber_iterations, .combine=rbind, .inorder=F) %do% {
       hc$hill_climb()
     }
     
