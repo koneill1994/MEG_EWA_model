@@ -6,3 +6,4 @@ Minimum_Effort_Game_EWA.R
 *.RData
 *.rds
 !MEG_human_data.rds
+*.tsv
