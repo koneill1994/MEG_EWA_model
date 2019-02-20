@@ -135,19 +135,23 @@ clusterEvalQ(cl,{
       step_size="numeric",
       seek_maxima="logical",
       bounds="numeric",
-      id="character"
+      id="character",
+      human_data="data.frame",
+      iter="numeric"
       ),
     methods=list(
       # bounds
       # p1min p1max
       # p2min p2max
       # p3min p3max
-      initialize=function(id, evalf, step_s, seek_max,bounds){
+      initialize=function(id, evalf, step_s, seek_max,bounds, hd){
         id            <<- id
         eval_function <<- evalf
         step_size     <<- step_s
         seek_maxima   <<- seek_max
         coords        <<- apply(bounds,1,function(x){return(runif(1,x[1],x[2]))})
+        human_data    <<- hd
+        iter          <<- 0
         },
       hill_climb=function(){
         # get a list of all adjacent coordinates
@@ -161,7 +165,7 @@ clusterEvalQ(cl,{
         # if(!is.null(cluster)){
         #   df=bind_rows(parApply(cluster,adjacent,1,eval_function))
         # } else {
-          df=bind_rows(apply(adjacent,1,eval_function))
+          df=bind_rows(apply(adjacent,1,function(x){eval_function(x,human_data)}))
         # }
         # ^ this one is the real one
         
@@ -169,8 +173,11 @@ clusterEvalQ(cl,{
         hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
         
         df$chosen=replace(rep(F,dim(df)[1]),hill_find,T)
+        df$hc_id=id
+        df$round=iter
         
         coords <<- adjacent[hill_find,]
+        iter   <<- iter+1
         # return the evaluated points so we can look at that later
         return(df)
       }
@@ -230,12 +237,14 @@ clusterEvalQ(cl,{
                                agent_type,round,mean))
                  )
     )
+    end_time=Sys.time()
+    
     return(
       data.frame( delta=mean(model_data_full$delta),
                   rho=mean(model_data_full$rho),
                   lambda=mean(model_data_full$lambda),
                   phi=mean(model_data_full$phi),
-                  initial_choice_data=I(list(choice_prob_data)),
+                  initial_choice_data=I(list(choice_data)),
                   rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
                                      compare_dat[compare_dat$agent_type=="model",]$mean)^2)),
                   start=start_time,
@@ -246,28 +255,18 @@ clusterEvalQ(cl,{
   }
   
   
-  hill_climber_eval=function(coords){
+  hill_climber_eval=function(coords, human_data){
+    
+    psd=c(.01,.01,.01,.01)
+    
+    # initial choice probabilities based on human data
+    choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
+    
+    # number of simulations to run
+    number_of_sims=10
+    
     return(model_run(coords, psd, choice_prob_data, number_of_sims, human_data))
   }
-
-  
-  
-  
-  
-  psd=c(.01,.01,.01,.01)
-  
-  # initial choice probabilities based on human data
-  choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
-  
-  # number of simulations to run
-  number_of_sims=75
-  
-  # number of means to search
-  # i.e. resolution of the parameter space
-  num_means=10
-  
-  # loop through different parameter sets here
-  param_means= seq(0,1,by=1/(num_means-1))
   
   
 })
@@ -304,6 +303,16 @@ if(!load_human_dat){
   human_data=readRDS("MEG_human_data.rds")
 }
 
+
+
+# number of means to search
+# i.e. resolution of the parameter space
+num_means=10
+
+# loop through different parameter sets here
+param_means= seq(0,1,by=1/(num_means-1))
+
+
 # set up the parallel computation
 registerDoParallel(cl)
 getDoParWorkers()
@@ -326,20 +335,53 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=10
-  climber_iterations=10
+  num_climbers=2
+  climber_iterations=2
   
   step_size=.1
   
   bounds=matrix(rep(c(0,1),each=4), nrow=4)
   
   hc_dat = foreach(climber=1:num_climbers, .combine=rbind, .inorder=F, .packages=packs) %dopar% {
-    hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds)
     
-    foreach(it=1:climber_iterations, .combine=rbind, .inorder=F) %do% {
-      hc$hill_climb()
-    }
+    # send info to run_model properly
     
+    hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds, human_data)
+    
+    return(
+      foreach(it=1:climber_iterations, .combine=rbind) %do% {
+        hc$hill_climb()
+      }
+    )
   }
   
+  
+  program_end_time=Sys.time()
+  
+  #save the fit data (IMPORTANT)
+  saveRDS(hc_dat, file=paste("./data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_EWA-hc.rds",sep=""))
+  
+  # work out a scope for the below so that we can actually output them
+  if(FALSE){
+    # write a log of the variables to keep track of config 
+    fileConn=file(paste("./data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_hc-configLog.tsv",sep=""))
+    writeLines(c(paste("program_start_time",program_start_time,sep="\t"),
+                 paste("program_end_time",program_end_time,sep="\t"),
+                 paste("num_workers",getDoParWorkers(),sep="\t"),
+                 paste("num_means",num_means,sep="\t"),
+                 paste("means",toString(param_means),sep="\t"),
+                 paste("sd's",toString(psd),sep="\t"),
+                 paste("choice_prob_data",toString(choice_prob_data),sep="\t"),
+                 paste("number_of_sims",number_of_sims,sep="\t"),
+                 paste("r_version",R.version.string,sep="\t"),
+                 paste("pc_info",toString(Sys.info()),sep="\t")
+    ), 
+    fileConn)
+    close(fileConn)
+  }
+  
+  
+  
 }
+
+stopCluster(cl)
