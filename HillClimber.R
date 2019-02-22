@@ -137,14 +137,16 @@ clusterEvalQ(cl,{
       bounds="numeric",
       id="character",
       human_data="data.frame",
-      iter="numeric"
+      checked_values="data.frame",
+      iter="numeric",
+      model_params="list"
       ),
     methods=list(
       # bounds
       # p1min p1max
       # p2min p2max
       # p3min p3max
-      initialize=function(id, evalf, step_s, seek_max,bounds, hd){
+      initialize=function(id, evalf, step_s, seek_max,bounds, hd,mp){
         id            <<- id
         eval_function <<- evalf
         step_size     <<- step_s
@@ -152,6 +154,8 @@ clusterEvalQ(cl,{
         coords        <<- apply(bounds,1,function(x){return(runif(1,x[1],x[2]))})
         human_data    <<- hd
         iter          <<- 0
+        checked_values<<- data.frame()
+        model_params  <<- mp
         },
       hill_climb=function(){
         # get a list of all adjacent coordinates
@@ -159,18 +163,29 @@ clusterEvalQ(cl,{
           foreach(ss=c(-step_size, step_size), .combine=rbind) %do% {
             replace(coords,d,coords[d]+ss)
           }
-        # evaluate them all in parallel
-        # df=data.frame(cbind(hc_id=id,adjacent,rmse=parApply(cl,adjacent,1,eval_function))) # just for testing
         
-        # if(!is.null(cluster)){
-        #   df=bind_rows(parApply(cluster,adjacent,1,eval_function))
-        # } else {
-          df=bind_rows(apply(adjacent,1,function(x){eval_function(x,human_data)}))
-        # }
-        # ^ this one is the real one
-        
+        # lookup table of previously checked values
+        # to save on computation time
+        df=data.frame()
+        for(ci in 1:nrow(adjacent)){
+          crd=adjacent[ci,]
+          llist=apply(checked_values,1,function(x){all(crd==x[1:length(coords)])})
+          if(any(llist)){
+            df=rbind(df,subset(checked_values,llist,1:ncol(checked_values)))
+          } else {
+            newrow=eval_function(crd,human_data, model_params)
+            checked_values <<- rbind(checked_values,setNames(newrow,names(checked_values)))
+            df=rbind(df,newrow)
+          }
+        }
+
         # find the min or max of the rmse's
-        hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
+        # hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
+        
+        # probably want to add in stochasticity
+        hill_find=is.element(df$rmse,sample(1:length(df$rmse), 1, prob=1-(df$rmse)/sum(df$rmse)))
+        # bounds of rmse
+        
         
         df$chosen=replace(rep(F,dim(df)[1]),hill_find,T)
         df$hc_id=id
@@ -255,19 +270,10 @@ clusterEvalQ(cl,{
   }
   
   
-  hill_climber_eval=function(coords, human_data){
-    
-    psd=c(.01,.01,.01,.01)
-    
-    # initial choice probabilities based on human data
-    choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
-    
-    # number of simulations to run
-    number_of_sims=10
-    
-    return(model_run(coords, psd, choice_prob_data, number_of_sims, human_data))
+  hill_climber_eval=function(coords, human_data, model_params){
+
+    return(model_run(coords, model_params$psd, model_params$choice_prob_data, model_params$number_of_sims, human_data))
   }
-  
   
 })
 
@@ -304,6 +310,16 @@ if(!load_human_dat){
 }
 
 
+model_params=list(
+  psd=c(.01,.01,.01,.01),
+  
+  # initial choice probabilities based on human data
+  choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175),
+  
+  # number of simulations to run
+  number_of_sims=10
+)
+
 
 # number of means to search
 # i.e. resolution of the parameter space
@@ -326,7 +342,7 @@ if(mode=="full"){
     foreach(l=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %:%
     foreach(ph=param_means, .combine=rbind, .inorder=F, .packages=c("dplyr")) %dopar% {
       pm=c(d,rh,l,ph)
-      model_run(pm, psd, choice_prob_data, number_of_sims, human_data)
+      model_run(pm, model_params$psd, model_params$choice_prob_data, model_params$number_of_sims, human_data)
     }
   
   # View(fit_data)
@@ -346,7 +362,7 @@ if(mode=="full"){
     
     # send info to run_model properly
     
-    hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds, human_data)
+    hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds, human_data, model_params)
     
     return(
       foreach(it=1:climber_iterations, .combine=rbind) %do% {
@@ -368,11 +384,12 @@ if(mode=="full"){
     writeLines(c(paste("program_start_time",program_start_time,sep="\t"),
                  paste("program_end_time",program_end_time,sep="\t"),
                  paste("num_workers",getDoParWorkers(),sep="\t"),
+                 paste("mode",mode,sep="\t"),
                  paste("num_means",num_means,sep="\t"),
                  paste("means",toString(param_means),sep="\t"),
-                 paste("sd's",toString(psd),sep="\t"),
-                 paste("choice_prob_data",toString(choice_prob_data),sep="\t"),
-                 paste("number_of_sims",number_of_sims,sep="\t"),
+                 paste("sd's",toString(model_params$psd),sep="\t"),
+                 paste("choice_prob_data",toString(model_params$choice_prob_data),sep="\t"),
+                 paste("number_of_sims",model_params$number_of_sims,sep="\t"),
                  paste("r_version",R.version.string,sep="\t"),
                  paste("pc_info",toString(Sys.info()),sep="\t")
     ), 
