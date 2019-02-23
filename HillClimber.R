@@ -291,8 +291,8 @@ load_human_dat=T
 mode_n=2
 mode=c("full","hc")[mode_n]
 
-# setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
-setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
+setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
+# setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
 
 
 # get human data to compare models to
@@ -317,7 +317,7 @@ model_params=list(
   choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175),
   
   # number of simulations to run
-  number_of_sims=10
+  number_of_sims=75
 )
 
 
@@ -351,8 +351,8 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=2
-  climber_iterations=2
+  num_climbers=5
+  climber_iterations=200
   
   step_size=.1
   
@@ -390,6 +390,10 @@ if(mode=="full"){
                  paste("sd's",toString(model_params$psd),sep="\t"),
                  paste("choice_prob_data",toString(model_params$choice_prob_data),sep="\t"),
                  paste("number_of_sims",model_params$number_of_sims,sep="\t"),
+                 paste("num_climbers",num_climbers,sep="\t"),
+                 paste("climber_iterations",climber_iterations,sep="\t"),
+                 paste("step_size",step_size,sep="\t"),
+                 paste("bounds",toString(bounds),sep="\t"),
                  paste("r_version",R.version.string,sep="\t"),
                  paste("pc_info",toString(Sys.info()),sep="\t")
     ), 
