@@ -146,8 +146,8 @@ clusterEvalQ(cl,{
       # p1min p1max
       # p2min p2max
       # p3min p3max
-      initialize=function(id, evalf, step_s, seek_max,bounds, hd,mp){
-        id            <<- id
+      initialize=function(hc_id, evalf, step_s, seek_max,bounds, hd,mp){
+        hc_id            <<- hc_id
         eval_function <<- evalf
         step_size     <<- step_s
         seek_maxima   <<- seek_max
@@ -183,12 +183,12 @@ clusterEvalQ(cl,{
         # hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
         
         # probably want to add in stochasticity
-        hill_find=is.element(df$rmse,sample(1:length(df$rmse), 1, prob=1-(df$rmse)/sum(df$rmse)))
+        hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=1-(df$rmse)/sum(df$rmse)),T)
         # bounds of rmse
         
         
-        df$chosen=replace(rep(F,dim(df)[1]),hill_find,T)
-        df$hc_id=id
+        df$chosen=hill_find
+        df$hc_id=hc_id
         df$round=iter
         
         coords <<- adjacent[hill_find,]
@@ -291,9 +291,9 @@ load_human_dat=T
 mode_n=2
 mode=c("full","hc")[mode_n]
 
-setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
+# setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
 # setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
-
+setwd("E:/Libraries/r projects/MEG_EWA_model-master")
 
 # get human data to compare models to
 if(!load_human_dat){
@@ -351,8 +351,8 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=5
-  climber_iterations=200
+  num_climbers=20
+  climber_iterations=500
   
   step_size=.1
   
@@ -377,32 +377,29 @@ if(mode=="full"){
   #save the fit data (IMPORTANT)
   saveRDS(hc_dat, file=paste("./data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_EWA-hc.rds",sep=""))
   
-  # work out a scope for the below so that we can actually output them
-  if(FALSE){
-    # write a log of the variables to keep track of config 
-    fileConn=file(paste("./data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_hc-configLog.tsv",sep=""))
-    writeLines(c(paste("program_start_time",program_start_time,sep="\t"),
-                 paste("program_end_time",program_end_time,sep="\t"),
-                 paste("num_workers",getDoParWorkers(),sep="\t"),
-                 paste("mode",mode,sep="\t"),
-                 paste("num_means",num_means,sep="\t"),
-                 paste("means",toString(param_means),sep="\t"),
-                 paste("sd's",toString(model_params$psd),sep="\t"),
-                 paste("choice_prob_data",toString(model_params$choice_prob_data),sep="\t"),
-                 paste("number_of_sims",model_params$number_of_sims,sep="\t"),
-                 paste("num_climbers",num_climbers,sep="\t"),
-                 paste("climber_iterations",climber_iterations,sep="\t"),
-                 paste("step_size",step_size,sep="\t"),
-                 paste("bounds",toString(bounds),sep="\t"),
-                 paste("r_version",R.version.string,sep="\t"),
-                 paste("pc_info",toString(Sys.info()),sep="\t")
-    ), 
-    fileConn)
-    close(fileConn)
-  }
-  
-  
-  
+
+  # write a log of the variables to keep track of config 
+  fileConn=file(paste("./data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_hc-configLog.tsv",sep=""))
+  writeLines(c(paste("program_start_time",program_start_time,sep="\t"),
+               paste("program_end_time",program_end_time,sep="\t"),
+               paste("num_workers",getDoParWorkers(),sep="\t"),
+               paste("mode",mode,sep="\t"),
+               paste("num_means",num_means,sep="\t"),
+               paste("means",toString(param_means),sep="\t"),
+               paste("sd's",toString(model_params$psd),sep="\t"),
+               paste("choice_prob_data",toString(model_params$choice_prob_data),sep="\t"),
+               paste("number_of_sims",model_params$number_of_sims,sep="\t"),
+               paste("num_climbers",num_climbers,sep="\t"),
+               paste("climber_iterations",climber_iterations,sep="\t"),
+               paste("step_size",step_size,sep="\t"),
+               paste("bounds",toString(bounds),sep="\t"),
+               paste("r_version",R.version.string,sep="\t"),
+               paste("pc_info",toString(Sys.info()),sep="\t")
+  ), 
+  fileConn)
+  close(fileConn)
 }
+  
+  
 
 stopCluster(cl)
