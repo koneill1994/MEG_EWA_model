@@ -42,8 +42,8 @@ clusterEvalQ(cl,{
         attraction_prev   <<- rep(0,7)
         N                 <<- rep(  0, length(choices))
         N_prev            <<- rep(  0, length(choices))
-        delta             <<- min(max(rnorm(1, mean = p_mean[1], sd = p_sd[1]),0),1)
-        rho               <<- min(max(rnorm(1, mean = p_mean[2], sd = p_sd[2]),0),1)
+        delta             <<- min(max(rnorm(1, mean = p_mean[1], sd = p_sd[1]),0),1) # remove stochasticity to improve 
+        rho               <<- min(max(rnorm(1, mean = p_mean[2], sd = p_sd[2]),0),1) # reliability?
         lambda            <<- min(max(rnorm(1, mean = p_mean[3], sd = p_sd[3]),0),1)
         phi               <<- min(max(rnorm(1, mean = p_mean[4], sd = p_sd[4]),0),1)
         choice_prob       <<- initial_choice_prob
@@ -127,77 +127,6 @@ clusterEvalQ(cl,{
     )
   )
   
-  MakeHillClimber=setRefClass(
-    "Hill_Climber",
-    fields=list(
-      coords="numeric",
-      eval_function="function",
-      step_size="numeric",
-      seek_maxima="logical",
-      bounds="numeric",
-      id="character",
-      human_data="data.frame",
-      checked_values="data.frame",
-      iter="numeric",
-      model_params="list"
-      ),
-    methods=list(
-      # bounds
-      # p1min p1max
-      # p2min p2max
-      # p3min p3max
-      initialize=function(hc_id, evalf, step_s, seek_max,bounds, hd,mp){
-        hc_id            <<- hc_id
-        eval_function <<- evalf
-        step_size     <<- step_s
-        seek_maxima   <<- seek_max
-        coords        <<- apply(bounds,1,function(x){return(runif(1,x[1],x[2]))})
-        human_data    <<- hd
-        iter          <<- 0
-        checked_values<<- data.frame()
-        model_params  <<- mp
-        },
-      hill_climb=function(){
-        # get a list of all adjacent coordinates
-        adjacent=foreach(d=1:length(coords), .combine=rbind) %:%
-          foreach(ss=c(-step_size, step_size), .combine=rbind) %do% {
-            replace(coords,d,coords[d]+ss)
-          }
-        
-        # lookup table of previously checked values
-        # to save on computation time
-        df=data.frame()
-        for(ci in 1:nrow(adjacent)){
-          crd=adjacent[ci,]
-          llist=apply(checked_values,1,function(x){all(crd==x[1:length(coords)])})
-          if(any(llist)){
-            df=rbind(df,subset(checked_values,llist,1:ncol(checked_values)))
-          } else {
-            newrow=eval_function(crd,human_data, model_params)
-            checked_values <<- rbind(checked_values,setNames(newrow,names(checked_values)))
-            df=rbind(df,newrow)
-          }
-        }
-
-        # find the min or max of the rmse's
-        # hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
-        
-        # probably want to add in stochasticity
-        hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=1-(df$rmse)/sum(df$rmse)),T)
-        # bounds of rmse
-        
-        
-        df$chosen=hill_find
-        df$hc_id=hc_id
-        df$round=iter
-        
-        coords <<- adjacent[hill_find,]
-        iter   <<- iter+1
-        # return the evaluated points so we can look at that later
-        return(df)
-      }
-      )
-    )
   
   model_run=function(parameter_means, parameter_sds, choice_data, n_sims, h_dat){
     # run the model n_sims times to get a modelled dataset based on 
@@ -242,40 +171,159 @@ clusterEvalQ(cl,{
       data.frame(unique(select(mutate(group_by(model_data, round),
                                       mean=mean(own_choice),
                                       agent_type="model"
-                                      ),
-                               agent_type,round,mean))
-                 ),
+      ),
+      agent_type,round,mean))
+      ),
       data.frame(unique(select(mutate(group_by(h_dat, round),
                                       mean=mean(choice),
                                       agent_type="human"
-                                      ),
-                               agent_type,round,mean))
-                 )
+      ),
+      agent_type,round,mean))
+      )
     )
     end_time=Sys.time()
     
     return(
-      data.frame( delta=mean(model_data_full$delta),
-                  rho=mean(model_data_full$rho),
-                  lambda=mean(model_data_full$lambda),
-                  phi=mean(model_data_full$phi),
-                  initial_choice_data=I(list(choice_data)),
-                  rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
-                                     compare_dat[compare_dat$agent_type=="model",]$mean)^2)),
-                  start=start_time,
-                  end=end_time,
-                  computation_time=end_time-start_time
+      data.frame( 
+        param_delta=parameter_means[1],
+        param_rho=parameter_means[2],
+        param_lambda=parameter_means[3],
+        param_phi=parameter_means[4],
+        delta=mean(model_data_full$delta),
+        rho=mean(model_data_full$rho),
+        lambda=mean(model_data_full$lambda),
+        phi=mean(model_data_full$phi),
+        initial_choice_data=I(list(choice_data)),
+        rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
+                           compare_dat[compare_dat$agent_type=="model",]$mean)^2)),
+        start=start_time,
+        end=end_time,
+        computation_time=end_time-start_time
       )
     )
   }
   
-  
-  hill_climber_eval=function(coords, human_data, model_params){
-
-    return(model_run(coords, model_params$psd, model_params$choice_prob_data, model_params$number_of_sims, human_data))
-  }
-  
 })
+
+MakeHillClimber=setRefClass(
+  "Hill_Climber",
+  fields=list(
+    coords="numeric",
+    eval_function="function",
+    step_size="numeric",
+    seek_maxima="logical",
+    bounds="numeric",
+    hc_id="character",
+    human_data="data.frame",
+    checked_values="data.frame",
+    iter="numeric",
+    model_params="list"
+    ),
+  methods=list(
+    # bounds
+    # p1min p1max
+    # p2min p2max
+    # p3min p3max
+    initialize=function(hc_id, evalf, step_s, seek_max,bounds, hd,mp){
+      hc_id            <<- hc_id
+      eval_function <<- evalf
+      step_size     <<- step_s
+      seek_maxima   <<- seek_max
+      coords        <<- apply(bounds,1,function(x){return(runif(1,x[1],x[2]))})
+      human_data    <<- hd
+      iter          <<- 0
+      checked_values<<- data.frame()
+      model_params  <<- mp
+      },
+    hill_climb=function(){
+      # get a list of all adjacent coordinates
+      adjacent=foreach(d=1:length(coords), .combine=rbind) %:%
+        foreach(ss=c(-step_size, step_size), .combine=rbind) %do% {
+          replace(coords,d,coords[d]+ss)
+        }
+      
+      # lookup table of previously checked values
+      # to save on computation time
+      df=foreach(ci = 1:nrow(adjacent),
+                 .combine=rbind,
+                 .packages=packs, 
+                 .export=c("checked_values",
+                           "coords",
+                           "eval_function",
+                           "human_data",
+                           "model_params"
+                           )
+                 ) %dopar% {
+        # grab a set of adjacent coordinates
+        crd=adjacent[ci,]
+        
+        # check and see if those coordinates have been checked before
+        llist=apply(checked_values,1,function(x){all(crd==x[1:length(coords)])})
+        
+        if(any(llist)){
+          # if so, grab them from memory
+          return(subset(checked_values,llist,1:ncol(checked_values)))
+        
+        } else {
+          # otherwise, compute the rmse value for those coordinates
+          newrow=eval_function(crd,human_data, model_params)
+          # put it into checked values for the future
+          checked_values <<- rbind(checked_values,setNames(newrow,names(checked_values)))
+          
+          #return the relevant values
+          return(newrow)
+        }
+      }
+      
+      # the following code determines which rows in df are not present in checked_values
+      # and therefore need to be added
+      # it is both beautiful and ugly in equal measure
+      # see if there's a more elegant way to determine this
+      if(sum(dim(checked_values))==0){
+        add_checked = rep(F,dim(df)[1])
+      } else {
+        add_checked = df[
+          apply( # which rows of df are not present in checked_values
+            apply(df,1,function(crd){ # which coordinates in df do not match something in checked_values
+              !(
+                apply(checked_values,1,function(x){ # which in checked_values match the given coordinate
+                  all(crd==x[1:length(crd)])
+                })
+              )
+            }),2,all),]
+      }
+      
+      checked_values <<- rbind(checked_values,df[add_checked])
+      
+      
+      
+
+      # find the min or max of the rmse's
+      # hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
+      
+      # probably want to add in stochasticity
+      hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=1-(df$rmse)/sum(df$rmse)),T)
+      # bounds of rmse
+      
+      
+      df$chosen=hill_find
+      df$hc_id=hc_id
+      df$round=iter
+      
+      coords <<- adjacent[hill_find,]
+      iter   <<- iter+1
+      # return the evaluated points so we can look at that later
+      return(df)
+    }
+    )
+  )
+
+
+
+hill_climber_eval=function(coords, human_data, model_params){
+  return(model_run(coords, model_params$psd, model_params$choice_prob_data, model_params$number_of_sims, human_data))
+}
+  
 
 
 
@@ -351,24 +399,32 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=20
-  climber_iterations=500
+  num_climbers=5
+  climber_iterations=100
   
   step_size=.1
   
   bounds=matrix(rep(c(0,1),each=4), nrow=4)
   
-  hc_dat = foreach(climber=1:num_climbers, .combine=rbind, .inorder=F, .packages=packs) %dopar% {
+  # change the algorithm so that this runs in serial
+  # and the nearby-tiles search runs in parallel
+  # will let us save data midway through more easily
+  # and makes more sense honestly, its better to have 1 completed hill climber than
+  # 6 half-completed hill climbers with no data
+  hc_dat = data.frame()
+    
+  for(climber in 1:num_climbers){
     
     # send info to run_model properly
     
     hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds, human_data, model_params)
     
-    return(
-      foreach(it=1:climber_iterations, .combine=rbind) %do% {
-        hc$hill_climb()
-      }
+    hc_dat=rbind(hc_dat,
+                 foreach(it=1:climber_iterations, .combine=rbind) %do% {
+                   hc$hill_climb()
+                 }
     )
+    
   }
   
   
@@ -403,3 +459,12 @@ if(mode=="full"){
   
 
 stopCluster(cl)
+
+
+# by my estimates this runs in 40 seconds approx for 1 climber doing 1 iteration
+# so for 500 iterations
+# 40*500/3600=5.5 hours for 1 climber with 500 iterations
+# 40*100/3600=1.1 hours for 1 climber with 100 iterations
+# so maybe 5 climbers at 100 iterations?
+
+# play with step size as well
