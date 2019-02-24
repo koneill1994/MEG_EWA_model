@@ -438,6 +438,7 @@ if(mode=="full"){
   fileConn=file(paste("./data/",format(program_end_time,"%Y-%m-%d_%H-%M-%S"),"_hc-configLog.tsv",sep=""))
   writeLines(c(paste("program_start_time",program_start_time,sep="\t"),
                paste("program_end_time",program_end_time,sep="\t"),
+               paste("program_duration",program_end_time-program_start_time,sep="\t"),
                paste("num_workers",getDoParWorkers(),sep="\t"),
                paste("mode",mode,sep="\t"),
                paste("num_means",num_means,sep="\t"),
