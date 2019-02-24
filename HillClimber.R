@@ -302,7 +302,7 @@ MakeHillClimber=setRefClass(
       # hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
       
       # probably want to add in stochasticity
-      hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=1-(df$rmse)/sum(df$rmse)),T)
+      hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=sum(df$rmse)/(df$rmse)),T)
       # bounds of rmse
       
       

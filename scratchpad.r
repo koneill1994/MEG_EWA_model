@@ -30,3 +30,39 @@ hc$hill_climb()
 
 
 crd=coords
+
+
+rmse(hc_dat[hc_dat$hc_id=="1",]$rmse)
+
+plot(hc_dat[hc_dat$hc_id=="1" & hc_dat$chosen,]$round,
+     hc_dat[hc_dat$hc_id=="1" & hc_dat$chosen,]$rmse,
+     type="l")
+
+
+library(ggplot2)
+
+ggplot(hc_dat[hc_dat$chosen,],aes(x=round,y=rmse,group=hc_id, color=hc_id))+
+  geom_line()
+
+# need to improve stochastic method so that odds are greater for lower rmse
+# too much randomness
+# maybe add in a parameter there?
+
+
+# hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
+
+df=data.frame(rmse=c(1,2,3,4,5,6,7,8,9,10)/sum(c(1,2,3,4,5,6,7,8,9,10)))
+
+seek_maxima=F
+
+hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
+
+hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=sum(df$rmse)/(df$rmse)),T)
+
+sum(df$rmse)/(df$rmse)
+
+
+
+replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=sum(df$rmse)/(df$rmse)),T)
+
+
