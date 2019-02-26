@@ -399,7 +399,7 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=5
+  num_climbers=10
   climber_iterations=100
   
   step_size=.1
