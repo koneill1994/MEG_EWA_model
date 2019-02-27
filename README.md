@@ -518,3 +518,148 @@ The fourth and final `%dopar%` will spin off 3 children each, leading to a total
 We end up with a bunch of processes which are doing nothing but wait for their children processes to finish, which isn't really useful or necessary, and will slow things down and eat up memory without offering anything useful.  Using `%:%`, we have the main process as the parent, and we have all of our allocated child processes running the stuff we want them to.  
 
 **Last thing to mention:** foreach loops have a return value.  Setting the `.combine` argument to `rbind` will perform the rbind operation to each value returned from the code inside, which in this case is the output of `model_run()`.  And if you recall above, the output of `model_run()` is a single-row dataframe containing all we want to know about the parameters of that model run and its fit to the human data.  So when this code finishes it will sew all of our model outputs in a nice neat dataframe, showing us the shape of the goodness-of-fit space, and letting us figure out which parameters fit the human data best.  
+
+# Hill climbing
+
+In our present age of big data, often the problem is too much data, not too little.  As can be seen in [Borges' Library of Babel](http://www.arts.ucsb.edu/faculty/reese/classes/artistsbooks/The%20Library%20of%20Babel.pdf),  A sum of information which defies categorization is as good as no information at all.  A full search of the parameter space does not lend itself easily to visualization or analysis, the former due to the confines of three spatial dimensions (draw me a picture of a five-dimensional hypersphere, and then we'll talk), and the latter due to the fact that the rmse surface of the parameter space is fairly flat.  
+
+Getting all the data, it turns out, isn't that useful in and of itself.  We can take the minimum rmse and find out what the values for that is, but it'll be a bit shy of .3, like most of the rmse values.  We won't have a good estimate of the size and shape of that region of minimum RMSE, or if it is a local minima or a global minima. 
+
+A [hill-climbing algorithm](https://en.wikipedia.org/wiki/Hill_climbing) (or in this case, hill-descending algorithm, but it depends on how you think about it)  is a good way to determine this.  We send a bunch of little agents into the parameter space, and for each iteration, they look at the rmse's of the adjacent spaces, and then choose the one with the lowest rmse.  After dozens of iterations, we can see where they ended up, and if they settled in one area, or continued to move.  If they settled in one area, we know that that area was a region of relatively low rmse values, and if they settle in multiple, we know that there are several regions of low rmse.  
+
+To this end, I've modifed the original script to incorporate a hill climbing parameter search, which will hopefully yield more informative results than a brute force search of the whole space.  
+
+A description of the [new script](https://github.com/koneill1994/MEG_EWA_model/blob/master/HillClimber.R) follows.  I will only be describing the portions added in this iteration; for the basic ewa model used as the evaluation function, see previous sections.  
+
+| Field | Description |
+|--|--|
+| `coords` | The current location of the hill climber agent in the parameter space.  Set to a random location within `bounds` at instantiation.  |
+| `eval_function` | The function used to evaluate the parameter space at any given point.  In our instance, this is `model_run`, because we want to run a model with the given parameters, and get its RMSE, measuring goodness of fit of a model with those parameters with human data |
+| `step_size` | Size of each step, i.e. the distance in each dimension the model should look to check its RMSE |
+| `seek_maxima` | A possibly deprecrated logical parameter which (ideally) would tell the model whether to do hill-climbing or hill-descending |
+| `bounds` | A matrix containing on each row the minimum (`row[1]`) and maximum (`row[2]`) values for the intiial starting position of that parameter.  The starting positions are drawn from a uniform distribution. |
+| `hc_id` | A name for the hill climber agent, to distinguish it from its fellows. |
+| `human_data` | The human data which is passed to the `eval_function`
+| `checked_values` | The process of checking a given location in the parameter space and retrieving its rmse value is computationally expensive.  Ideally we would keep a record of values we've already checked, so that if the agent checks a spot it checked before, we can just draw that from memory, instead of computing a new value from scratch.  Not sure if it works right now.  |
+| `iter` | Number of iterations or rounds the model is on.  For each iteration, the model checks its surroundings and chooses a new location to step to.  |
+| `model_params` |  A list with parameters to be passed to `eval_function` |
+
+And now the algorithm itself.  
+
+---
+
+```r
+hill_climb=function(){
+```
+
+This is the function itself, called once per iteration for each hill climber.  
+
+---
+
+```r
+adjacent=foreach(d=1:length(coords), .combine=rbind) %:%
+  foreach(ss=c(-step_size, step_size), .combine=rbind) %do% {
+    replace(coords,d,coords[d]+ss)
+  }
+```
+
+Get a list of all possible places the agent could move to, defined as locations reached by moving orthogonally in either direction along the axis of one (and only one) variable, to a distance of `step_size`.  No diagonals allowed.  For 4 parameters, this gives us 8 adjacent locations to check.  
+
+---
+
+```r
+df=foreach(ci = 1:nrow(adjacent),
+           .combine=rbind,
+           .packages=packs, 
+           .export=c("checked_values",
+                     "coords",
+                     "eval_function",
+                     "human_data",
+                     "model_params"
+                     )
+           ) %dopar% {
+  # grab a set of adjacent coordinates
+  crd=adjacent[ci,]
+
+  # check and see if those coordinates have been checked before
+  llist=apply(checked_values,1,function(x){all(crd==x[1:length(coords)])})
+
+  if(any(llist)){
+    # if so, grab them from memory
+    return(subset(checked_values,llist,1:ncol(checked_values)))
+
+  } else {
+    # otherwise, compute the rmse value for those coordinates
+    newrow=eval_function(crd,human_data, model_params)
+    # put it into checked values for the future
+    checked_values <<- rbind(checked_values,setNames(newrow,names(checked_values)))
+
+    #return the relevant values
+    return(newrow)
+  }
+}
+```
+
+Breaking it down:
+
+```r
+df=foreach(ci = 1:nrow(adjacent),
+           .combine=rbind,
+           .packages=packs, 
+           .export=c("checked_values",
+                     "coords",
+                     "eval_function",
+                     "human_data",
+                     "model_params"
+                     )
+           ) %dopar% {
+```
+
+We want to evaluate each set of coordinates adjacent to the current location.  We run it in parallel because we can, and because each evaluation is independent, not relying on data from a previous evaluation.  
+
+---
+
+```r
+crd=adjacent[ci,]
+```
+
+Set crd to the set of coordinates in question.  
+
+---
+
+```r
+llist=apply(checked_values,1,function(x){all(crd==x[1:length(coords)])})
+```
+Look through each previously checked value, and get a list of logicals (hence `llist`) which describe for each set of coordinates in checked_values whether or not it is equal to the current coordinates in question.  
+
+---
+
+```r
+if(any(llist)){
+  return(subset(checked_values,llist,1:ncol(checked_values)))
+```
+
+If this coordinate is one that has been seen before, return its rmse value from memory instead of calculating it from scratch.  
+
+---
+
+```r
+} else {
+  newrow=eval_function(crd,human_data, model_params)
+  checked_values <<- rbind(checked_values,setNames(newrow,names(checked_values)))
+  return(newrow)
+}
+```
+
+If we haven't seen it before, evaluate it using eval_function (in our case, to then run it through the EWA model), add the coordinates and their associated RMSE value to `checked_values`, and then return the coordinates and rmse.  
+
+---
+
+```r
+if(sum(dim(checked_values))==0){
+  add_checked = rep(F,dim(df)[1])
+```
+
+If checked_values is empty, we will not need to add any values to it, so we set add_checked to a matrix of `FALSE` the same size as the number of values we check.  
+
+This is possibly the bug.  
