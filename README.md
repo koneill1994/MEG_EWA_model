@@ -662,4 +662,88 @@ if(sum(dim(checked_values))==0){
 
 If checked_values is empty, we will not need to add any values to it, so we set add_checked to a matrix of `FALSE` the same size as the number of values we check.  
 
-This is possibly the bug.  
+This is possibly the bug thats causing nothing to be put into `checked_values`.  
+
+---
+
+```r
+else {
+  add_checked = df[
+    apply( # which rows of df are not present in checked_values
+      apply(df,1,function(crd){ # which coordinates in df do not match something in checked_values
+        !(
+          apply(checked_values,1,function(x){ # which in checked_values match the given coordinate
+            all(crd==x[1:length(crd)])
+          })
+        )
+      }),2,all),]
+}
+
+checked_values <<- rbind(checked_values,df[add_checked])
+```
+
+Add the coordinates which were not present in `checked_values` to `checked_values`.  
+
+---
+
+```r
+# hill_find=ifelse(seek_maxima, which.max, which.min)(df$rmse)
+
+# probably want to add in stochasticity
+hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=sum(df$rmse)/(df$rmse)),T)
+```
+
+Two different methods of deciding where the agent will move for the next round.  The first (commented out here), will choose either the minimum rmse value or maximum rmse value, depending on whether seek_maxima is true or false.  
+
+The second is a stochastic method of choosing a next location, based on the inverse proportion of each individual rmse to the sum of rmse values.  
+
+---
+
+```r
+df$chosen=hill_find
+df$hc_id=hc_id
+df$round=iter
+```
+
+Set a boolean to true on the coordinate we chose, and false on the ones we didn't choose.  Record the id and round.  
+
+---
+
+```r
+coords <<- adjacent[hill_find,]
+iter   <<- iter+1
+```
+
+Set our current location to the new location, and iterate the round number.  
+
+---
+
+```r
+hill_climber_eval=function(coords, human_data, model_params){
+  return(model_run(coords, model_params$psd, model_params$choice_prob_data, model_params$number_of_sims, human_data))
+}
+```
+
+This is a wrapper for our `model_run` function, which is called from `hill_climber`.  
+
+---
+
+```r
+num_climbers=10
+climber_iterations=100
+step_size=.01
+bounds=matrix(rep(c(0,1),each=4), nrow=4)
+hc_dat = data.frame()
+
+for(climber in 1:num_climbers){
+  hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds, human_data, model_params)
+
+  hc_dat=rbind(hc_dat,
+               foreach(it=1:climber_iterations, .combine=rbind) %do% {
+                 hc$hill_climb()
+               }
+  )
+}
+```
+
+Set some parameter values at the start, and then run through each hill climber, having them `hill_climb` `climber_iterations` number of times.  
