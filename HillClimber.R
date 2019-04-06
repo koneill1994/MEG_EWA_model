@@ -135,7 +135,7 @@ clusterEvalQ(cl,{
       step_size="numeric",
       seek_maxima="logical",
       bounds="numeric",
-      id="character",
+      hc_id="character",
       human_data="data.frame",
       checked_values="data.frame",
       iter="numeric",
@@ -147,7 +147,7 @@ clusterEvalQ(cl,{
       # p2min p2max
       # p3min p3max
       initialize=function(hc_id, evalf, step_s, seek_max,bounds, hd,mp){
-        hc_id            <<- hc_id
+        hc_id         <<- hc_id
         eval_function <<- evalf
         step_size     <<- step_s
         seek_maxima   <<- seek_max
@@ -274,10 +274,10 @@ clusterEvalQ(cl,{
                   initial_choice_data=I(list(choice_data)),
                   rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
                                      compare_dat[compare_dat$agent_type=="model",]$mean)^2)),
-                  human_mean_var_corr=compare_dat[compare_dat$agent_type=="human",]$mean_var_corr,
-                  model_mean_var_corr=compare_dat[compare_dat$agent_type=="model",]$mean_var_corr,
-                  mean_var_corr_abs_diff=abs(compare_dat[compare_dat$agent_type=="human",]$mean_var_corr-
-                                               compare_dat[compare_dat$agent_type=="model",]$mean_var_corr),
+                  human_mean_var_corr=mean(compare_dat[compare_dat$agent_type=="human",]$mean_var_corr),
+                  model_mean_var_corr=mean(compare_dat[compare_dat$agent_type=="model",]$mean_var_corr),
+                  mean_var_corr_abs_diff=mean(abs(compare_dat[compare_dat$agent_type=="human",]$mean_var_corr-
+                                               compare_dat[compare_dat$agent_type=="model",]$mean_var_corr)),
                   start=start_time,
                   end=end_time,
                   computation_time=end_time-start_time
@@ -384,10 +384,15 @@ if(mode=="full"){
     
     hc=MakeHillClimber(as.character(climber), hill_climber_eval, step_size, F, bounds, human_data, model_params)
 
-    for(it in 1:climber_iterations){
-      hc_dat=rbind(hc_dat,hc$hill_climb())
-    }
+    # initialize a smaller df to hold one climber's data
+    # replace hc_dat here with the smaller df
+    # return the smaller df so it gets rbinded for the output
+    climber_dat=data.frame()
     
+    for(it in 1:climber_iterations){
+      climber_dat=rbind(climber_dat,hc$hill_climb())
+    }
+    return(climber_dat)
   }
   
   

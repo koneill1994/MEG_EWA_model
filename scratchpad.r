@@ -85,7 +85,7 @@ h_dat=human_data
 # human_data))
 
 
-model_run(parameter_means,parameter_sds,choice_data,number_of_sims,human_data)
+model_run(parameter_means,parameter_sds,choice_data,n_sims,human_data)
 
 
 # Correlation of 
