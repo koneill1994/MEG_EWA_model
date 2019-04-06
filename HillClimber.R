@@ -373,8 +373,8 @@ if(mode=="full"){
   
   num_climbers=20
   climber_iterations=500
-  
-  step_size=.1
+
+  step_size=.01
   
   bounds=matrix(rep(c(0,1),each=4), nrow=4)
   

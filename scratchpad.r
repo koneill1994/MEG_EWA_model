@@ -68,9 +68,6 @@ replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=sum(df$rmse)/(df$rms
 
 
 
-
-
-
 #####
 
 # 4-6-19
