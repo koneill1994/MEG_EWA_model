@@ -308,8 +308,8 @@ mode_n=2
 mode=c("full","hc")[mode_n]
 
 # setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
-setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
-# setwd("E:/Libraries/r projects/MEG_EWA_model-master")
+# setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
+setwd("E:/Libraries/r projects/MEG_EWA_model-master")
 
 # get human data to compare models to
 if(!load_human_dat){
@@ -323,7 +323,7 @@ if(!load_human_dat){
 } else{
   # load in the human data we've prepared earlier
   # human_data=readRDS("MEG_human_data.rds")
-  setwd("C:/Users/Kevin/Dropbox/minimum_effort_game")
+  # setwd("C:/Users/Kevin/Dropbox/minimum_effort_game")
   
   human_data=read.csv("MEG_Group_Data_Kevin_Format.csv")[,2:5]
   colnames(human_data)=c("group","subject","round","choice")
@@ -371,7 +371,7 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=20
+  num_climbers=1
   climber_iterations=500
 
   step_size=.01

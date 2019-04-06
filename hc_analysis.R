@@ -7,6 +7,8 @@ setwd("E:/Libraries/r projects/MEG_EWA_model-master/data")
 # df=readRDS("2019-02-25_18-50-29_EWA-hc.rds")
 # start with this one
 
+# m_df=readRDS("2019-02-27_08-21-27_EWA-hc.rds")
+
 id_count=0
 m_df=foreach(file=dir()[grepl("EWA-hc.rds",dir())], .combine=rbind) %do% {
   f_obj=readRDS(file)
