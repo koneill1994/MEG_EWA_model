@@ -129,3 +129,11 @@ data.frame(unique(select(mutate(group_by(h_dat, round),
 ),
 agent_type,round,mean,mean_var_corr))
 )
+
+library(ggplot2)
+
+# this will inspect the data
+ggplot(hc_dat[hc_dat$chosen,], aes(x=round,y=mean_var_corr_abs_diff, group=hc_id, color=hc_id))+
+         geom_line()
+       
+# lines(hc_dat[hc_dat$chosen,]$round,hc_dat[hc_dat$chosen,]$mean_var_corr_abs_diff)
