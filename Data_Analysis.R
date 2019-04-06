@@ -19,6 +19,7 @@ Just_d1a=T
 #--------------------
 setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_model")
 d1a=read.csv("ALL DATA up to session 10.csv", header=T)
+
 #------------------------------------------------------
 d1a$Condition=ifelse(d1a$Group %% 2 == 0, 2,1 )
 a=group_by(d1a, Group, Round)

@@ -66,3 +66,69 @@ sum(df$rmse)/(df$rmse)
 replace(rep(F,dim(df)[1]),sample(1:length(df$rmse), 1, prob=sum(df$rmse)/(df$rmse)),T)
 
 
+
+
+
+
+
+#####
+
+# 4-6-19
+
+parameter_means=c(.5,.5,.5,.5)
+parameter_sds=c(.1,.1,.1,.1)
+choice_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175)
+n_sims=5
+h_dat=human_data
+
+#     return(model_run(coords, 
+# model_params$psd, 
+# model_params$choice_prob_data, 
+# model_params$number_of_sims, 
+# human_data))
+
+
+model_run(parameter_means,parameter_sds,choice_data,number_of_sims,human_data)
+
+
+# Correlation of 
+# mean of all choices for all 4 players for all 20 rounds within 1 simulation
+# Variance of choice for all 4 players for all 20 rounds within 1 simulation
+mean_var_corr=
+  cor(
+    aggregate(model_data$own_choice, by=list(sim=model_data$sim), FUN=mean)$x,
+    aggregate(model_data$own_choice, by=list(sim=model_data$sim), FUN=var)$x
+  )
+
+mean_var_corr=
+  cor(
+    aggregate(h_dat$choice, by=list(sim=h_dat$sim), FUN=mean)$x,
+    aggregate(h_dat$choice, by=list(sim=h_dat$sim), FUN=var)$x
+  )
+
+
+
+
+data.frame(unique(select(mutate(group_by(model_data, round),
+                                mean=mean(own_choice),
+                                agent_type="model",
+                                mean_var_corr=
+                                  cor(
+                                    aggregate(model_data$own_choice, by=list(sim=model_data$sim), FUN=mean)$x,
+                                    aggregate(model_data$own_choice, by=list(sim=model_data$sim), FUN=var)$x
+                                  )
+),
+agent_type,round,mean,mean_var_corr))
+)
+
+data.frame(unique(select(mutate(group_by(h_dat, round),
+                                mean=mean(choice),
+                                agent_type="human",
+                                mean_var_corr=
+                                  cor(
+                                    aggregate(h_dat$choice, by=list(sim=h_dat$group), FUN=mean)$x,
+                                    aggregate(h_dat$choice, by=list(sim=h_dat$group), FUN=var)$x
+                                  )
+),
+agent_type,round,mean,mean_var_corr))
+)
