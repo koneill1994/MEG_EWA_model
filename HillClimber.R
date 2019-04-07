@@ -387,14 +387,9 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-<<<<<<< HEAD
   #num_climbers=1
   num_climbers=15
   climber_iterations=100
-=======
-  num_climbers=detectCores(logical = FALSE)
-  climber_iterations=10
->>>>>>> 8953c6b5b7ac57d2563e6add12dda166a707c077
 
   step_size=.001
   
