@@ -184,8 +184,13 @@ clusterEvalQ(cl,{
         
         # per mike's new change, we are now optimizing on mean_var_corr_abs_diff
         
-        # probbaly want to add in stochasticity
-        hill_find=replace(rep(F,dim(df)[1]),sample(1:length(df$mean_var_corr_abs_diff), 1, prob=1-(df$mean_var_corr_abs_diff)/sum(df$mean_var_corr_abs_diff)),T)
+        hill_find=replace(rep(F,dim(df)[1]),
+                          sample(1:length(df$mean_var_corr_abs_diff), 
+                                 1, 
+                                 prob=df$mean_var_corr_abs_diff^(1/(model_params$stoch*ifelse(seek_maxima, 1, -1)))/
+                                   sum(df$mean_var_corr_abs_diff^(1/(model_params$stoch*ifelse(seek_maxima, 1, -1))))
+                          ),
+                          T)
         # bounds of rmse
         
         
@@ -268,9 +273,13 @@ clusterEvalQ(cl,{
     
     return(
       data.frame( delta=mean(model_data_full$delta),
+                  delta_sd=sd(model_data_full$delta),
                   rho=mean(model_data_full$rho),
+                  rho_sd=sd(model_data_full$rho),
                   lambda=mean(model_data_full$lambda),
+                  lambda_sd=mean(model_data_full$lambda),
                   phi=mean(model_data_full$phi),
+                  phi_sd=sd(model_data_full$phi),
                   initial_choice_data=I(list(choice_data)),
                   rmse=sqrt(mean(( compare_dat[compare_dat$agent_type=="human",]$mean-
                                      compare_dat[compare_dat$agent_type=="model",]$mean)^2)),
@@ -308,8 +317,8 @@ mode_n=2
 mode=c("full","hc")[mode_n]
 
 # setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
-# setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
-setwd("E:/Libraries/r projects/MEG_EWA_model-master")
+setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
+# setwd("E:/Libraries/r projects/MEG_EWA_model-master")
 
 # get human data to compare models to
 if(!load_human_dat){
@@ -337,7 +346,14 @@ model_params=list(
   choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175),
   
   # number of simulations to run
-  number_of_sims=75
+  # number_of_sims=75,
+  number_of_sims=10,
+  
+  # stochasticity parameter
+  # minimum is zero
+  # higher is more random
+  # 1 is direct proportion to evaluation values
+  stoch=.25
 )
 
 
@@ -371,7 +387,7 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=1
+  num_climbers=detectCores(logical = FALSE)
   climber_iterations=10
 
   step_size=.01

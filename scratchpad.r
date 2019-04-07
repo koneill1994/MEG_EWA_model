@@ -132,8 +132,21 @@ agent_type,round,mean,mean_var_corr))
 
 library(ggplot2)
 
+setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
+hc_dat=readRDS("./data/2019-04-07_11-56-04_EWA-hc.rds")
+
 # this will inspect the data
 ggplot(hc_dat[hc_dat$chosen,], aes(x=round,y=mean_var_corr_abs_diff, group=hc_id, color=hc_id))+
          geom_line()
        
 # lines(hc_dat[hc_dat$chosen,]$round,hc_dat[hc_dat$chosen,]$mean_var_corr_abs_diff)
+
+
+
+probs=c(1,2,3)
+
+n=-1
+
+k=probs^(1/n)/sum(probs^(1/n))
+
+pie(k)
