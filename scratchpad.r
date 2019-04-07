@@ -84,6 +84,8 @@ h_dat=human_data
 # model_params$number_of_sims, 
 # human_data))
 
+a=Make_EWA_model("1",parameter_means,parameter_sds,choice_data)
+a$id
 
 model_run(parameter_means,parameter_sds,choice_data,n_sims,human_data)
 
