@@ -340,7 +340,7 @@ if(!load_human_dat){
 
 
 model_params=list(
-  psd=c(.01,.01,.01,.01),
+  psd=c(.1,.1,.1,.1),
   
   # initial choice probabilities based on human data
   choice_prob_data=c(0.05882353, 0.07352941, 0.17647059, 0.22058824, 0.22058824, 0.10294118, 0.14705882),
@@ -429,6 +429,7 @@ if(mode=="full"){
                paste("sd's",toString(model_params$psd),sep="\t"),
                paste("choice_prob_data",toString(model_params$choice_prob_data),sep="\t"),
                paste("number_of_sims",model_params$number_of_sims,sep="\t"),
+               paste("hc_stochasticity",model_params$stoch,sep="\t"),
                paste("num_climbers",num_climbers,sep="\t"),
                paste("climber_iterations",climber_iterations,sep="\t"),
                paste("step_size",step_size,sep="\t"),
