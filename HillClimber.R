@@ -371,10 +371,11 @@ if(mode=="full"){
   
 } else if (mode=="hc"){
   
-  num_climbers=1
-  climber_iterations=10
+  #num_climbers=1
+  num_climbers=15
+  climber_iterations=100
 
-  step_size=.01
+  step_size=.001
   
   bounds=matrix(rep(c(0,1),each=4), nrow=4)
   
