@@ -343,7 +343,7 @@ model_params=list(
   psd=c(.01,.01,.01,.01),
   
   # initial choice probabilities based on human data
-  choice_prob_data=c(0.025, 0.100, 0.200, 0.250, 0.175, 0.075, 0.175),
+  choice_prob_data=c(0.05882353, 0.07352941, 0.17647059, 0.22058824, 0.22058824, 0.10294118, 0.14705882),
   
   # number of simulations to run
   # number_of_sims=75,
