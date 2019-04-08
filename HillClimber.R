@@ -178,6 +178,9 @@ clusterEvalQ(cl,{
             df=rbind(df,newrow)
           }
         }
+        
+        
+        
 
         # find the min or max of the rmse's
         # hill_find=ifelse(seek_maxima, which.max, which.min)(df$mean_var_corr_abs_diff)
