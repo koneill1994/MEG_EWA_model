@@ -280,7 +280,7 @@ clusterEvalQ(cl,{
                   rho=mean(model_data_full$rho),
                   rho_sd=sd(model_data_full$rho),
                   lambda=mean(model_data_full$lambda),
-                  lambda_sd=mean(model_data_full$lambda),
+                  lambda_sd=sd(model_data_full$lambda),
                   phi=mean(model_data_full$phi),
                   phi_sd=sd(model_data_full$phi),
                   initial_choice_data=I(list(choice_data)),

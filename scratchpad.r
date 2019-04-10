@@ -145,6 +145,8 @@ library(ggplot2)
 setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
 hc_dat=readRDS("./data/2019-04-07_23-31-35_EWA-hc.rds")
 
+mean(hc_dat$lambda_sd)
+
 # this will inspect the data
 ggplot(hc_dat[hc_dat$chosen,], aes(x=round,y=mean_var_corr_abs_diff, group=hc_id, color=hc_id))+
          geom_line()
