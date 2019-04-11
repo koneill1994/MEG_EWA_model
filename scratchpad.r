@@ -132,13 +132,24 @@ data.frame(unique(select(mutate(group_by(h_dat, round),
 agent_type,round,mean,mean_var_corr))
 )
 
+
+a=c(1,2,3,4)
+(a-a)^2
+
+euclid_dist=function(a,b){
+  sqrt(sum((a-b)^2))
+}
+
 library(ggplot2)
 
 # setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
 # hc_dat=readRDS("./data/2019-04-07_11-56-04_EWA-hc.rds")
 
 setwd("E:/Libraries/r projects/MEG_EWA_model-master")
+setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
 hc_dat=readRDS("./data/2019-04-07_23-31-35_EWA-hc.rds")
+
+mean(hc_dat$lambda_sd)
 
 # this will inspect the data
 ggplot(hc_dat[hc_dat$chosen,], aes(x=round,y=mean_var_corr_abs_diff, group=hc_id, color=hc_id))+
@@ -146,7 +157,30 @@ ggplot(hc_dat[hc_dat$chosen,], aes(x=round,y=mean_var_corr_abs_diff, group=hc_id
        
 # lines(hc_dat[hc_dat$chosen,]$round,hc_dat[hc_dat$chosen,]$mean_var_corr_abs_diff)
 
+ggplot(hc_dat[hc_dat$chosen,], aes(x=rmse,y=mean_var_corr_abs_diff, group=hc_id, color=hc_id))+
+  geom_point()
 
+hc_start=data.frame()
+for(hc in unique(hc_dat$hc_id)){
+  hc_start=rbind(hc_start,
+                 cbind(hc=hc,
+                      hc_dat[hc_dat$chosen & hc_dat$hc_id==hc,][1,c(1,3,5,7)]
+                 )
+  )
+}
+
+
+hc_dat$dist_from_start=
+  apply(hc_dat,1,function(x){
+    euclid_dist(
+      x[c(1,3,5,7)],
+      hc_start[x$hc_id==hc_start$hc,2:5]
+      )
+    }
+  )
+
+ggplot(hc_dat[hc_dat$chosen,], aes(x=round,y=dist_from_start, group=hc_id, color=hc_id))+
+  geom_line()
 
 probs=c(1,2,3)
 
