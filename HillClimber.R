@@ -317,8 +317,8 @@ mode_n=2
 mode=c("full","hc")[mode_n]
 
 # setwd("/home/kevin/Documents/ewa/MEG_EWA_model")
-setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
-# setwd("E:/Libraries/r projects/MEG_EWA_model-master")
+# setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
+setwd("E:/Libraries/r projects/MEG_EWA_model-master")
 
 # get human data to compare models to
 if(!load_human_dat){
@@ -353,7 +353,7 @@ model_params=list(
   # minimum is zero
   # higher is more random
   # 1 is direct proportion to evaluation values
-  stoch=.25
+  stoch=.15
 )
 
 
@@ -389,7 +389,7 @@ if(mode=="full"){
   
   #num_climbers=1
   num_climbers=15
-  climber_iterations=100
+  climber_iterations=200
 
   step_size=.001
   

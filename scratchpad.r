@@ -134,8 +134,11 @@ agent_type,round,mean,mean_var_corr))
 
 library(ggplot2)
 
-setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
-hc_dat=readRDS("./data/2019-04-07_11-56-04_EWA-hc.rds")
+# setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
+# hc_dat=readRDS("./data/2019-04-07_11-56-04_EWA-hc.rds")
+
+setwd("E:/Libraries/r projects/MEG_EWA_model-master")
+hc_dat=readRDS("./data/2019-04-07_23-31-35_EWA-hc.rds")
 
 # this will inspect the data
 ggplot(hc_dat[hc_dat$chosen,], aes(x=round,y=mean_var_corr_abs_diff, group=hc_id, color=hc_id))+
