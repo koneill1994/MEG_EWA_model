@@ -147,7 +147,7 @@ library(ggplot2)
 
 setwd("E:/Libraries/r projects/MEG_EWA_model-master")
 setwd("C:/Users/Kevin/Dropbox/minimum_effort_game/EWA_Model")
-hc_dat=readRDS("./data/2019-04-07_23-31-35_EWA-hc.rds")
+hc_dat=readRDS("./data/2019-04-11_01-23-43_EWA-hc.rds")
 
 mean(hc_dat$lambda_sd)
 

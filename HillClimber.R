@@ -350,7 +350,7 @@ model_params=list(
   
   # number of simulations to run
   # number_of_sims=75,
-  number_of_sims=10,
+  number_of_sims=75,
   
   # stochasticity parameter
   # minimum is zero
@@ -391,8 +391,8 @@ if(mode=="full"){
 } else if (mode=="hc"){
   
   #num_climbers=1
-  num_climbers=15
-  climber_iterations=200
+  num_climbers=30
+  climber_iterations=50
 
   step_size=.001
   
